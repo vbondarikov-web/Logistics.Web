@@ -1,0 +1,1124 @@
+﻿@page "/task/{Id}"
+@inject NavigationManager Nav
+@using System.Globalization
+@using Microsoft.AspNetCore.Components.Web
+@using Logistics.Web.Models
+
+<style>
+    .task-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+
+    .task-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #ffffff;
+        margin: 0;
+    }
+
+    .task-back {
+        margin-left: auto;
+        color: #a7f3d0;
+        font-size: 12px;
+        text-decoration: none;
+        border: 1px solid rgba(255,255,255,.25);
+        padding: 4px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        background: none;
+        font-family: inherit;
+    }
+
+        .task-back:hover {
+            background: rgba(255,255,255,.08);
+        }
+
+    .task-page {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 420px;
+        gap: 12px;
+        align-items: stretch;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    .tcard {
+        background: #ffffff;
+        border-radius: 10px;
+        padding: 12px 14px;
+        color: #0f172a;
+        box-shadow: 0 4px 16px rgba(0,0,0,.12);
+        min-width: 0;
+        overflow: hidden;
+        box-sizing: border-box;
+    }
+
+    .tlbl {
+        display: block;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .3px;
+        text-transform: uppercase;
+        color: #64748b;
+        margin: 6px 0 2px;
+    }
+
+    .tinp, .tsel {
+        width: 100%;
+        max-width: 100%;
+        height: 30px;
+        padding: 0 8px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        background: #f8fafc;
+        color: #0f172a;
+        font-size: 12px;
+        outline: none;
+        box-sizing: border-box;
+    }
+
+        .tinp:focus, .tsel:focus {
+            border-color: #00a884;
+            background: #ffffff;
+        }
+
+    textarea.tinp {
+        height: 50px;
+        padding: 6px 8px;
+        resize: vertical;
+    }
+
+    .thint {
+        font-size: 10px;
+        color: #94a3b8;
+        margin-top: 2px;
+    }
+
+    .trow2 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .trow3 {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .tinline {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .thot {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: #dc2626;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .tbtn-take {
+        height: 30px;
+        padding: 0 12px;
+        border: none;
+        border-radius: 6px;
+        background: #0f766e;
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+        .tbtn-take:hover {
+            background: #115e59;
+        }
+
+    .ttaken {
+        font-size: 11px;
+        font-style: italic;
+        color: #64748b;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .twarn {
+        color: #dc2626;
+        font-size: 10px;
+        margin-top: 1px;
+    }
+
+    .tlist {
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        overflow-y: auto;
+        padding: 4px 6px;
+        background: #f8fafc;
+        margin-top: 3px;
+        box-sizing: border-box;
+        width: 100%;
+    }
+
+        .tlist.h90 {
+            height: 90px;
+        }
+
+        .tlist.h110 {
+            height: 110px;
+        }
+
+    .tchk {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        padding: 2px 0;
+        color: #1e293b;
+        cursor: pointer;
+    }
+
+        .tchk:hover {
+            color: #0f766e;
+        }
+
+    .tadd {
+        height: 30px;
+        width: 32px;
+        flex-shrink: 0;
+        border: none;
+        border-radius: 6px;
+        background: #00a884;
+        color: #ffffff;
+        font-size: 16px;
+        cursor: pointer;
+    }
+
+        .tadd:hover {
+            background: #029474;
+        }
+
+    .tcount {
+        font-size: 10px;
+        color: #94a3b8;
+        margin-bottom: 2px;
+    }
+
+    .tchips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 4px;
+    }
+
+    .tchip {
+        background: #ecfdf5;
+        color: #047857;
+        border: 1px solid #a7f3d0;
+        border-radius: 10px;
+        padding: 1px 7px;
+        font-size: 10px;
+    }
+
+    .tbtn-save {
+        height: 34px;
+        padding: 0 20px;
+        border: none;
+        border-radius: 6px;
+        background: #00a884;
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+        .tbtn-save:hover {
+            background: #029474;
+        }
+
+    .cost-strip {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+    }
+
+    .tbtn-cost {
+        height: 32px;
+        padding: 0 14px;
+        border: 1px dashed #00a884;
+        border-radius: 8px;
+        background: #ecfdf5;
+        color: #047857;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+        .tbtn-cost:hover {
+            background: #d1fae5;
+        }
+
+    .cost-chip {
+        background: #0f766e;
+        color: #ffffff;
+        border-radius: 10px;
+        padding: 5px 12px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .tchat {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 120px);
+        box-sizing: border-box;
+    }
+
+    .tchat-title {
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 2px;
+    }
+
+    .tchat-hint {
+        font-size: 10px;
+        color: #94a3b8;
+        margin-bottom: 8px;
+    }
+
+    .tchat-list {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding-right: 2px;
+    }
+
+    .tmsg {
+        background: #f8fafc;
+        border-radius: 8px;
+        padding: 7px 8px;
+        border: 1px solid #edf2f7;
+        cursor: context-menu;
+    }
+
+        .tmsg:hover {
+            border-color: #a7f3d0;
+            background: #f0fdfa;
+        }
+
+    .tmsg-top {
+        display: flex;
+        gap: 6px;
+        align-items: baseline;
+    }
+
+    .tmsg-author {
+        font-size: 10px;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .tmsg-date {
+        font-size: 9px;
+        color: #94a3b8;
+    }
+
+    .tmsg-edited {
+        font-size: 9px;
+        color: #94a3b8;
+        font-style: italic;
+    }
+
+    .tmsg-text {
+        font-size: 12px;
+        color: #1e293b;
+        white-space: pre-wrap;
+        margin-top: 2px;
+        word-break: break-word;
+    }
+
+    .tmini {
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        color: #475569;
+        font-size: 9px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+        .tmini:hover {
+            background: #f1f5f9;
+        }
+
+    .treply {
+        font-size: 10px;
+        font-style: italic;
+        color: #0f766e;
+        background: #ecfdf5;
+        border-radius: 4px;
+        padding: 4px 6px;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .tedit {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 6px;
+        padding: 6px 8px;
+        margin-bottom: 4px;
+    }
+
+    .tedit-inp {
+        width: 100%;
+        border: 1px solid #cbd5e1;
+        border-radius: 5px;
+        padding: 5px 7px;
+        font-size: 12px;
+        font-family: inherit;
+        resize: vertical;
+        box-sizing: border-box;
+    }
+
+    .tempty {
+        font-size: 11px;
+        color: #94a3b8;
+    }
+
+    .ctx-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 3000;
+    }
+
+    .ctx-menu {
+        position: fixed;
+        z-index: 3001;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0,0,0,.28);
+        padding: 5px;
+        min-width: 160px;
+    }
+
+    .ctx-item {
+        display: block;
+        width: 100%;
+        text-align: left;
+        border: none;
+        background: transparent;
+        padding: 8px 12px;
+        font-size: 12.5px;
+        color: #1e293b;
+        border-radius: 6px;
+        cursor: pointer;
+        font-family: inherit;
+    }
+
+        .ctx-item:hover {
+            background: #ecfdf5;
+            color: #047857;
+        }
+
+        .ctx-item.danger:hover {
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
+    .dlg-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(2,6,23,.55);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+    }
+
+    .dlg {
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 18px 20px;
+        width: 340px;
+        max-width: 94vw;
+        box-shadow: 0 20px 50px rgba(0,0,0,.35);
+        color: #0f172a;
+    }
+
+    .dlg-title {
+        font-size: 15px;
+        font-weight: 800;
+    }
+
+    .dlg-sub {
+        font-size: 12px;
+        color: #64748b;
+        margin: 2px 0 10px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ck {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12.5px;
+        color: #1e293b;
+        padding: 3px 0;
+        cursor: pointer;
+    }
+
+    .dlg-preview {
+        margin-top: 10px;
+        background: #f0fdfa;
+        border: 1px solid #99f6e4;
+        color: #0f766e;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 12px;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .dlg-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 14px;
+    }
+
+    .dlg-btn {
+        height: 34px;
+        padding: 0 14px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        color: #334155;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+        .dlg-btn:hover {
+            background: #f1f5f9;
+        }
+
+        .dlg-btn.primary {
+            background: #00a884;
+            border-color: #00a884;
+            color: #ffffff;
+        }
+
+            .dlg-btn.primary:hover {
+                background: #029474;
+            }
+
+    @@media (max-width: 1150px) {
+        .task-page {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .tchat {
+            height: 400px;
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .trow2, .trow3 {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+</style>
+
+<div class="task-head">
+    <h2 class="task-title">@(isNew ? "Новая заявка" : "Карточка заявки")</h2>
+    <button type="button" class="task-back" @onclick="GoBack">← К заявкам</button>
+</div>
+
+@if (notFound)
+{
+    <div class="tcard">Заявка не найдена</div>
+}
+else
+{
+    <div class="task-page">
+
+        <div class="tcard">
+            <label class="tlbl">Название задачи</label>
+            <input class="tinp" @bind="task.Title" @bind:event="oninput" />
+
+            <div class="trow2">
+                <div>
+                    <label class="tlbl">Дата постановки</label>
+                    <input type="date" class="tinp" @bind="task.TaskDate" />
+                </div>
+                <div>
+                    <div class="tinline" style="justify-content:space-between">
+                        <label class="tlbl" style="margin:6px 0 2px">Срок</label>
+                        <label class="thot"><input type="checkbox" @bind="task.IsHot" /> Горящая заявка</label>
+                    </div>
+                    <input type="date" class="tinp" @bind="task.Deadline" />
+                </div>
+            </div>
+
+            <div class="tinline wrap-row" style="margin-top:8px">
+                <label class="tlbl" style="margin:0">Статус</label>
+                <select class="tsel" style="width:130px" @bind="task.Status">
+                    <option>Новая</option>
+                    <option>В работе</option>
+                    <option>Выполнена</option>
+                    <option>Не актуально</option>
+                </select>
+                <button class="tbtn-take" @onclick="TakeToWork">Взять в работу</button>
+                @if (!string.IsNullOrEmpty(task.TakenBy))
+                {
+                    <span class="ttaken">В работе: @task.TakenBy</span>
+                }
+            </div>
+
+            <label class="tlbl">Клиент (из вкладки «Наши клиенты»)</label>
+            <select class="tsel" @bind="task.ClientName" @bind:after="OnClientChanged">
+                <option value="">— выберите клиента —</option>
+                @foreach (var c in ClientStore.Clients)
+                {
+                    <option value="@c.Name">@c.Name</option>
+                }
+                @if (!string.IsNullOrWhiteSpace(task.ClientName)
+                     && !ClientStore.Clients.Any(c => c.Name == task.ClientName))
+                {
+                    <option value="@task.ClientName">@task.ClientName (нет в справочнике)</option>
+                }
+            </select>
+
+            <div class="trow3">
+                <div>
+                    <label class="tlbl">ИНН</label>
+                    <input class="tinp" @bind="task.Inn" @bind:event="oninput" />
+                </div>
+                <div>
+                    <label class="tlbl">КПП</label>
+                    <input class="tinp" @bind="task.Kpp" @bind:event="oninput" />
+                </div>
+                <div>
+                    <label class="tlbl">Объём, тонн</label>
+                    <input class="tinp" @bind="task.Volume" @bind:event="oninput" @bind:after="CheckVolume" />
+                    @if (volumeWarn)
+                    {
+                        <div class="twarn">Требуется объём побольше!</div>
+                    }
+                </div>
+            </div>
+
+            <label class="tlbl">Описание задачи</label>
+            <textarea class="tinp" @bind="task.Description" @bind:event="oninput"></textarea>
+
+            <div class="trow2">
+                <div>
+                    <label class="tlbl">Пункт загрузки</label>
+                    <input class="tinp" @bind="task.LoadingPoint" @bind:event="oninput" />
+                </div>
+                <div>
+                    <label class="tlbl">Пункт выгрузки</label>
+                    <input class="tinp" @bind="task.UnloadingPoint" @bind:event="oninput" />
+                </div>
+            </div>
+
+            <div class="cost-strip">
+                <button type="button" class="tbtn-cost" @onclick="OpenCostModal">Просчитать себестоимость</button>
+                @if (task.Cost.HasValue && task.Cost.Value > 0)
+                {
+                    <span class="cost-chip">Себестоимость: @task.Cost.Value.ToString("N0") ₽</span>
+                }
+            </div>
+
+            <div class="trow2">
+                <div>
+                    <label class="tlbl">Тип ТС</label>
+                    <input class="tinp" placeholder="Поиск..." @bind="vehicleSearch" @bind:event="oninput" />
+                    <div class="tlist h110">
+                        @foreach (var v in VehicleItems.Where(x => Match(x.Name, vehicleSearch)))
+                        {
+                            <label class="tchk"><input type="checkbox" @bind="v.IsChecked" /> @v.Name</label>
+                        }
+                    </div>
+                    <div class="tinline" style="margin-top:4px">
+                        <input class="tinp" placeholder="Новый тип ТС" @bind="newVehicle" @bind:event="oninput" />
+                        <button class="tadd" @onclick="AddVehicle">+</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="tlbl">Тип груза</label>
+                    <input class="tinp" placeholder="Поиск..." @bind="cargoSearch" @bind:event="oninput" />
+                    <div class="tlist h110">
+                        @foreach (var v in CargoItems.Where(x => Match(x.Name, cargoSearch)))
+                        {
+                            <label class="tchk"><input type="checkbox" @bind="v.IsChecked" /> @v.Name</label>
+                        }
+                    </div>
+                    <div class="tinline" style="margin-top:4px">
+                        <input class="tinp" placeholder="Новый тип груза" @bind="newCargo" @bind:event="oninput" />
+                        <button class="tadd" @onclick="AddCargo">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="trow2">
+                <div>
+                    <label class="tlbl">Способ загрузки</label>
+                    <input class="tinp" placeholder="Поиск..." @bind="loadSearch" @bind:event="oninput" />
+                    <div class="tlist h90">
+                        @foreach (var v in LoadItems.Where(x => Match(x.Name, loadSearch)))
+                        {
+                            <label class="tchk"><input type="checkbox" @bind="v.IsChecked" /> @v.Name</label>
+                        }
+                    </div>
+                </div>
+                <div>
+                    <label class="tlbl">Способ выгрузки</label>
+                    <input class="tinp" placeholder="Поиск..." @bind="unloadSearch" @bind:event="oninput" />
+                    <div class="tlist h90">
+                        @foreach (var v in UnloadItems.Where(x => Match(x.Name, unloadSearch)))
+                        {
+                            <label class="tchk"><input type="checkbox" @bind="v.IsChecked" /> @v.Name</label>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="trow2">
+                <div>
+                    <label class="tlbl">Исполнители</label>
+                    <div class="tcount">Выбрано: @ExecItems.Count(x => x.IsChecked)</div>
+                    <div class="tlist h90">
+                        @foreach (var e in ExecItems)
+                        {
+                            <label class="tchk"><input type="checkbox" @bind="e.IsChecked" /> @e.Name</label>
+                        }
+                    </div>
+                </div>
+                <div>
+                    <label class="tlbl">Наблюдатели</label>
+                    <div class="tcount">Выбрано: @ObsItems.Count(x => x.IsChecked)</div>
+                    <div class="tlist h90">
+                        @foreach (var e in ObsItems)
+                        {
+                            <label class="tchk"><input type="checkbox" @bind="e.IsChecked" /> @e.Name</label>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top:10px">
+                <button class="tbtn-save" @onclick="Save">Сохранить</button>
+            </div>
+        </div>
+
+        <div class="tcard tchat">
+            <div class="tchat-title">Чат задачи</div>
+            <div class="tchat-hint">ПКМ по сообщению — «Ответить», «Процитировать», «Редактировать», «Переслать»</div>
+
+            <div class="tchat-list">
+                @if (task.Comments.Count == 0)
+                {
+                    <div class="tempty">Сообщений нет</div>
+                }
+                @foreach (var c in task.Comments)
+                {
+                    <div class="tmsg"
+                         @oncontextmenu="e => OpenCtx(e, c)"
+                         @oncontextmenu:preventDefault="true">
+                        <div class="tmsg-top">
+                            <span class="tmsg-author">@c.Author</span>
+                            <span class="tmsg-date">@c.CreatedAt</span>
+                            @if (c.IsEdited)
+                            {
+                                <span class="tmsg-edited">(изменено)</span>
+                            }
+                        </div>
+                        <div class="tmsg-text">@c.Text</div>
+                    </div>
+                }
+            </div>
+
+            @if (editComment != null)
+            {
+                <div class="tedit">
+                    <div class="tchat-hint">Редактирование сообщения</div>
+                    <textarea class="tedit-inp" rows="2" @bind="editText"></textarea>
+                    <div class="tinline" style="margin-top:5px">
+                        <button class="tmini" @onclick="SaveEdit">Сохранить</button>
+                        <button class="tmini" @onclick="CancelEdit">Отмена</button>
+                    </div>
+                </div>
+            }
+
+            @if (replyTo != null)
+            {
+                <div class="treply">
+                    Ответ: @replyTo.Author — @Cut(replyTo.Text)
+                    <button class="tmini" style="margin-left:auto" @onclick="CancelReply">×</button>
+                </div>
+            }
+
+            <div class="tinline" style="margin-top:6px">
+                <input class="tinp" placeholder="Сообщение... (Enter — отправить)"
+                       @bind="msg" @bind:event="oninput" @onkeydown="OnMsgKeyDown" />
+                <button class="tbtn-save" style="height:30px; padding:0 12px; font-size:12px" @onclick="Send">OK</button>
+            </div>
+        </div>
+
+    </div>
+
+    @if (ctxComment != null)
+    {
+        <div class="ctx-backdrop" @onclick="CloseCtx" @oncontextmenu="CloseCtx" @oncontextmenu:preventDefault="true"></div>
+
+        <div class="ctx-menu" style="left:@(ctxX)px; top:@(ctxY)px;">
+            <button type="button" class="ctx-item" @onclick="CtxReply">Ответить</button>
+            <button type="button" class="ctx-item" @onclick="CtxQuote">Процитировать</button>
+            @if (IsOwn(ctxComment))
+            {
+                <button type="button" class="ctx-item" @onclick="CtxEdit">Редактировать</button>
+            }
+            <button type="button" class="ctx-item" @onclick="CtxForward">Переслать</button>
+        </div>
+    }
+
+    @if (costModal)
+    {
+        <div class="dlg-backdrop" @onclick="CloseCostModal">
+            <div class="dlg" @onclick:stopPropagation="true">
+                <div class="dlg-title">Заполните данные для расчёта</div>
+                <div class="dlg-sub">@task.Title</div>
+
+                <label class="ck"><input type="checkbox" @bind="costRoundTrip" /> Учесть кругорейс</label>
+                <label class="ck"><input type="checkbox" @bind="costLeasingTruck" /> Учесть лизинг тягача</label>
+                <label class="ck"><input type="checkbox" @bind="costLeasingTrailer" /> Учесть лизинг прицепа</label>
+
+                <label class="tlbl">Километраж, км</label>
+                <input type="number" class="tinp" @bind="costKm" />
+                <label class="tlbl">Зарплата водителя, ₽</label>
+                <input type="number" class="tinp" @bind="costSalary" />
+                <label class="tlbl">Автодор, ₽</label>
+                <input type="number" class="tinp" @bind="costAvtodor" />
+
+                <div class="dlg-preview">Предварительно: @CalcCost().ToString("N0") ₽</div>
+
+                <div class="dlg-actions">
+                    <button class="dlg-btn" @onclick="CloseCostModal">Отменить</button>
+                    <button class="dlg-btn primary" @onclick="ComputeCost">Просчитать</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    class CheckItem
+    {
+        public string Name { get; set; } = "";
+        public bool IsChecked { get; set; }
+    }
+
+    WorkTask task = new();
+    bool isNew;
+    bool notFound;
+    bool volumeWarn;
+
+    string vehicleSearch = "", cargoSearch = "", loadSearch = "", unloadSearch = "";
+    string newVehicle = "", newCargo = "";
+
+    List<CheckItem> VehicleItems = new();
+    List<CheckItem> CargoItems = new();
+    List<CheckItem> LoadItems = new();
+    List<CheckItem> UnloadItems = new();
+    List<CheckItem> ExecItems = new();
+    List<CheckItem> ObsItems = new();
+
+    List<string> SelectedVehicles => VehicleItems.Where(x => x.IsChecked).Select(x => x.Name).ToList();
+    List<string> SelectedCargos => CargoItems.Where(x => x.IsChecked).Select(x => x.Name).ToList();
+
+    string msg = "";
+    TaskComment? replyTo;
+
+    TaskComment? ctxComment;
+    int ctxX, ctxY;
+
+    TaskComment? editComment;
+    string editText = "";
+
+    bool costModal;
+    double costKm, costSalary, costAvtodor;
+    bool costRoundTrip, costLeasingTruck, costLeasingTrailer;
+
+    protected override void OnInitialized()
+    {
+        if (string.Equals(Id, "new", StringComparison.OrdinalIgnoreCase))
+        {
+            isNew = true;
+            task = new WorkTask();
+        }
+        else
+        {
+            var found = TaskStore.Tasks.FirstOrDefault(x => x.Id.ToString() == Id);
+            if (found == null) { notFound = true; return; }
+            task = found;
+        }
+
+        VehicleItems = Dictionaries.VehicleTypes
+            .Select(n => new CheckItem { Name = n, IsChecked = task.Vehicles.Contains(n) }).ToList();
+        CargoItems = Dictionaries.CargoTypes
+            .Select(n => new CheckItem { Name = n, IsChecked = task.Cargos.Contains(n) }).ToList();
+        LoadItems = Dictionaries.LoadingMethods
+            .Select(n => new CheckItem { Name = n, IsChecked = task.LoadingMethods.Contains(n) }).ToList();
+        UnloadItems = Dictionaries.LoadingMethods
+            .Select(n => new CheckItem { Name = n, IsChecked = task.UnloadingMethods.Contains(n) }).ToList();
+        ExecItems = EmployeeStore.Employees
+            .Select(e => new CheckItem { Name = e.FullName, IsChecked = task.Executors.Contains(e.FullName) }).ToList();
+        ObsItems = EmployeeStore.Employees
+            .Select(e => new CheckItem { Name = e.FullName, IsChecked = task.Observers.Contains(e.FullName) }).ToList();
+
+        CheckVolume();
+    }
+
+    bool Match(string name, string query) =>
+        string.IsNullOrWhiteSpace(query) || (name ?? "").Contains(query.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    string Cut(string text) =>
+        string.IsNullOrEmpty(text) ? "" : (text.Length > 40 ? text.Substring(0, 40) + "…" : text);
+
+    void CheckVolume()
+    {
+        var raw = (task.Volume ?? "").Replace(',', '.');
+        volumeWarn = double.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) && v > 0 && v < 20;
+    }
+
+    void OnClientChanged()
+    {
+        var c = ClientStore.Clients.FirstOrDefault(x => x.Name == task.ClientName);
+        if (c != null) { task.Inn = c.Inn; task.Kpp = c.Kpp; }
+    }
+
+    void TakeToWork()
+    {
+        task.Status = "В работе";
+        task.TakenBy = AuthStore.Current?.Fio ?? "Пользователь";
+        TaskStore.Notify(task, "Взята в работу", task.Title + " — " + task.TakenBy);
+        SqliteStore.SaveAll();
+    }
+
+    void AddVehicle()
+    {
+        var name = (newVehicle ?? "").Trim();
+        if (name.Length == 0) return;
+        if (!Dictionaries.VehicleTypes.Contains(name)) Dictionaries.VehicleTypes.Add(name);
+        var item = VehicleItems.FirstOrDefault(x => x.Name == name);
+        if (item == null) VehicleItems.Add(new CheckItem { Name = name, IsChecked = true });
+        else item.IsChecked = true;
+        newVehicle = "";
+    }
+
+    void AddCargo()
+    {
+        var name = (newCargo ?? "").Trim();
+        if (name.Length == 0) return;
+        if (!Dictionaries.CargoTypes.Contains(name)) Dictionaries.CargoTypes.Add(name);
+        var item = CargoItems.FirstOrDefault(x => x.Name == name);
+        if (item == null) CargoItems.Add(new CheckItem { Name = name, IsChecked = true });
+        else item.IsChecked = true;
+        newCargo = "";
+    }
+
+    // ---------- Себестоимость ----------
+
+    void OpenCostModal()
+    {
+        costKm = task.CostKm; costSalary = task.CostSalary; costAvtodor = task.CostAvtodor;
+        costRoundTrip = task.CostRoundTrip;
+        costLeasingTruck = task.CostLeasingTruck;
+        costLeasingTrailer = task.CostLeasingTrailer;
+        costModal = true;
+    }
+
+    void CloseCostModal() => costModal = false;
+
+    double CalcCost()
+    {
+        const double fuelPrice = 55, repairNorm = 60000, platonPerKm = 3.5, admin = 15000;
+        const double osago = 8000, kaskoTrailer = 8000, kaskoTruck = 25000;
+        const double leasingTrailer = 40000, leasingTruck = 120000;
+
+        double kmv = costKm < 0 ? 0 : costKm;
+        double roundKm = costRoundTrip ? kmv * 2 : kmv;
+        double fuel = 0.54 * roundKm * fuelPrice / 1.22;
+        double days = kmv == 0 ? 0.42 : ((roundKm / 80) / 24) + 0.42;
+
+        double leasTruck = costLeasingTruck ? leasingTruck / 30.5 * days : 0;
+        double leasTrailer = costLeasingTrailer ? leasingTrailer / 30.5 * days : 0;
+
+        return costSalary + fuel + leasTruck + leasTrailer
+             + osago / 30.5 * days + kaskoTruck / 30.5 * days + kaskoTrailer / 30.5 * days
+             + roundKm * platonPerKm + 10 * roundKm + (10 * roundKm) / 3
+             + admin + costAvtodor + repairNorm / 30.5;
+    }
+
+    void ComputeCost()
+    {
+        var value = CalcCost();
+        task.Cost = value;
+        task.CostKm = costKm; task.CostSalary = costSalary; task.CostAvtodor = costAvtodor;
+        task.CostRoundTrip = costRoundTrip;
+        task.CostLeasingTruck = costLeasingTruck;
+        task.CostLeasingTrailer = costLeasingTrailer;
+
+        TaskStore.Notify(task, "Просчитана себестоимость",
+            task.Title + " — " + value.ToString("N0") + " ₽");
+
+        SqliteStore.SaveAll();
+        costModal = false;
+    }
+
+    // ---------- Контекстное меню чата ----------
+
+    bool IsOwn(TaskComment c) =>
+        string.Equals(c.Author, AuthStore.Current?.FullName, StringComparison.Ordinal);
+
+    void OpenCtx(MouseEventArgs e, TaskComment c)
+    {
+        ctxComment = c;
+        ctxX = (int)e.ClientX;
+        ctxY = (int)e.ClientY;
+    }
+
+    void CloseCtx() => ctxComment = null;
+
+    void CtxReply() { if (ctxComment != null) replyTo = ctxComment; ctxComment = null; }
+
+    void CtxQuote()
+    {
+        if (ctxComment == null) return;
+        var quoted = "> " + ctxComment.Author + ": " + ctxComment.Text.Replace("\n", "\n> ");
+        msg = string.IsNullOrWhiteSpace(msg) ? quoted + "\n" : msg + "\n" + quoted + "\n";
+        ctxComment = null;
+    }
+
+    void CtxEdit()
+    {
+        if (ctxComment == null || !IsOwn(ctxComment)) { ctxComment = null; return; }
+        editComment = ctxComment;
+        editText = ctxComment.Text;
+        ctxComment = null;
+    }
+
+    void SaveEdit()
+    {
+        if (editComment == null) return;
+        if (!string.IsNullOrWhiteSpace(editText))
+        {
+            editComment.Text = editText.Trim();
+            editComment.IsEdited = true;
+            SqliteStore.SaveAll();
+        }
+        editComment = null;
+        editText = "";
+    }
+
+    void CancelEdit() { editComment = null; editText = ""; }
+
+    void CtxForward()
+    {
+        if (ctxComment == null) return;
+        msg = "Переслано от " + ctxComment.Author + ": " + ctxComment.Text;
+        ctxComment = null;
+    }
+
+    // ---------- Чат ----------
+
+    void CancelReply() => replyTo = null;
+
+    void OnMsgKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") Send();
+    }
+
+    void Send()
+    {
+        if (string.IsNullOrWhiteSpace(msg)) return;
+
+        var text = msg.Trim();
+        if (replyTo != null)
+        {
+            text = "↪ " + replyTo.Author + ": " + Cut(replyTo.Text) + "\n" + text;
+        }
+
+        task.Comments.Add(new TaskComment
+        {
+            Author = AuthStore.Current?.Fio ?? "Пользователь",
+            Text = text
+        });
+
+        NotificationStore.Add("Чат", "Новое сообщение", task.Title + ": " + text);
+
+        msg = "";
+        replyTo = null;
+        SqliteStore.SaveAll();
+    }
+
+    // ---------- Выход из заявки: обнуляем счётчик изменений ----------
+
+    void GoBack()
+    {
+        task.ChangeCount = 0;
+        SqliteStore.SaveAll();
+        Nav.NavigateTo("/");
+    }
+
+    void Save()
+    {
+        if (string.IsNullOrWhiteSpace(task.Title)) task.Title = "Без названия";
+
+        task.Vehicles = SelectedVehicles;
+        task.Cargos = SelectedCargos;
+        task.LoadingMethods = LoadItems.Where(x => x.IsChecked).Select(x => x.Name).ToList();
+        task.UnloadingMethods = UnloadItems.Where(x => x.IsChecked).Select(x => x.Name).ToList();
+        task.Executors = ExecItems.Where(x => x.IsChecked).Select(x => x.Name).ToList();
+        task.Observers = ObsItems.Where(x => x.IsChecked).Select(x => x.Name).ToList();
+
+        if (isNew)
+        {
+            TaskStore.Tasks.Add(task);
+            NotificationStore.Add("Заявка", "Создана заявка", task.Title);
+        }
+        else
+        {
+            TaskStore.Notify(task, "Заявка изменена", task.Title);
+        }
+
+        task.ChangeCount = 0;   // выход из заявки — счётчик обнуляется
+        SqliteStore.SaveAll();
+        Nav.NavigateTo("/");
+    }
+}

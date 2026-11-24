@@ -1,0 +1,247 @@
+﻿@page "/clients"
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@using Logistics.Web.Models
+
+<style>
+    .cl-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+    }
+
+    .cl-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: #ffffff;
+        margin: 0;
+    }
+
+    .cl-search {
+        margin-left: auto;
+        height: 36px;
+        width: 280px;
+        max-width: 100%;
+        border-radius: 9px;
+        border: 1px solid rgba(255,255,255,.22);
+        background: rgba(255,255,255,.10);
+        color: #ffffff;
+        padding: 0 12px;
+        font-size: 13px;
+        outline: none;
+    }
+
+        .cl-search::placeholder {
+            color: #94d8c8;
+        }
+
+        .cl-search:focus {
+            border-color: #00a884;
+            background: rgba(255,255,255,.16);
+        }
+
+    .btn-create-client {
+        height: 36px;
+        padding: 0 16px;
+        border: none;
+        border-radius: 8px;
+        background: #00a884;
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+        .btn-create-client:hover {
+            background: #029474;
+        }
+
+    .clients-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 14px;
+    }
+
+    .client-card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 14px 16px;
+        box-shadow: 0 4px 16px rgba(0,0,0,.15);
+        color: #0f172a;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        transition: transform .15s ease, box-shadow .15s ease;
+    }
+
+        .client-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,.22);
+        }
+
+    .cl-top-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+    }
+
+    .cl-name {
+        font-size: 15px;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.25;
+    }
+
+    .cl-desc {
+        font-size: 12px;
+        color: #64748b;
+        line-height: 1.35;
+    }
+
+    .cl-inn {
+        font-size: 11.5px;
+        color: #334155;
+        font-weight: 600;
+    }
+
+    .cl-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 2px;
+    }
+
+    .cl-tag {
+        font-size: 10.5px;
+        background: #f0fdfa;
+        color: #0f766e;
+        border: 1px solid #99f6e4;
+        padding: 2px 7px;
+        border-radius: 6px;
+    }
+
+    .cl-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-top: 1px solid #f1f5f9;
+        padding-top: 8px;
+        margin-top: 4px;
+        font-size: 11px;
+        color: #94a3b8;
+    }
+
+    .cl-del {
+        border: none;
+        background: transparent;
+        color: #cbd5e1;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+        .cl-del:hover {
+            color: #ef4444;
+        }
+
+    .cl-empty {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 30px;
+        text-align: center;
+        color: #64748b;
+        font-size: 14px;
+    }
+</style>
+
+<div class="cl-head">
+    <h2 class="cl-title">Наши клиенты</h2>
+    <button type="button" class="btn-create-client" @onclick="CreateClient">+ Добавить клиента</button>
+    <input class="cl-search" placeholder="Поиск по клиентам, ИНН..." @bind="search" @bind:event="oninput" />
+</div>
+
+@if (FilteredClients.Count == 0)
+{
+    <div class="cl-empty">
+        @(string.IsNullOrWhiteSpace(search) ? "Клиентов пока нет. Нажмите «+ Добавить клиента»." : "Ничего не найдено.")
+    </div>
+}
+else
+{
+    <div class="clients-grid">
+        @foreach (var c in FilteredClients)
+        {
+            <div class="client-card" @onclick="() => OpenClient(c.Id)">
+                <div class="cl-top-row">
+                    <div class="cl-name">@c.Name</div>
+                    <button type="button" class="cl-del" title="Удалить"
+                            @onclick:stopPropagation="true"
+                            @onclick="() => DeleteClient(c)">
+                        🗑
+                    </button>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(c.ShortDesc))
+                {
+                    <div class="cl-desc">@c.ShortDesc</div>
+                }
+
+                <div class="cl-inn">
+                    ИНН: @(string.IsNullOrWhiteSpace(c.Inn) ? "—" : c.Inn) ·
+                    КПП: @(string.IsNullOrWhiteSpace(c.Kpp) ? "—" : c.Kpp)
+                </div>
+
+                @if (c.Routes.Count > 0)
+                {
+                    <div class="cl-tags">
+                        @foreach (var r in c.Routes.Take(2))
+                        {
+                            <span class="cl-tag">📍 @r.Display</span>
+                        }
+                        @if (c.Routes.Count > 2)
+                        {
+                            <span class="cl-tag">+@(c.Routes.Count - 2) напр.</span>
+                        }
+                    </div>
+                }
+
+                <div class="cl-foot">
+                    <span>Контактов: @c.Contacts.Count</span>
+                    <span>ЭДО: @(string.IsNullOrWhiteSpace(c.EdoId) ? "нет" : c.EdoId)</span>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    string search = "";
+
+    List<Client> FilteredClients => ClientStore.Clients
+        .Where(c => string.IsNullOrWhiteSpace(search)
+            || (c.Name ?? "").Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)
+            || (c.Inn ?? "").Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)
+            || (c.ShortDesc ?? "").Contains(search.Trim(), StringComparison.OrdinalIgnoreCase))
+        .OrderBy(c => c.Name)
+        .ToList();
+
+    void CreateClient() => Nav.NavigateTo("/client/new");
+
+    void OpenClient(Guid id) => Nav.NavigateTo($"/client/{id}");
+
+    async Task DeleteClient(Client c)
+    {
+        var ok = await JS.InvokeAsync<bool>("confirm", $"Удалить клиента «{c.Name}»?");
+        if (ok)
+        {
+            ClientStore.Clients.Remove(c);
+            SqliteStore.SaveAll();
+        }
+    }
+}

@@ -1,0 +1,398 @@
+﻿@page "/login"
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@using Microsoft.AspNetCore.Components.Web
+@using Logistics.Web.Models
+
+<style>
+    .auth-page {
+        position: fixed;
+        inset: 0;
+        background: radial-gradient(circle at 20% 20%, #0f4c52 0%, #08272c 55%, #04141a 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        overflow-y: auto;
+        z-index: 50;
+    }
+
+    .auth-card {
+        width: 100%;
+        max-width: 430px;
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 26px 26px 22px;
+        box-shadow: 0 24px 60px rgba(0,0,0,.45);
+        color: #0f172a;
+        box-sizing: border-box;
+    }
+
+    .auth-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .auth-badge {
+        background: #00a884;
+        color: #fff;
+        font-weight: 800;
+        font-size: 15px;
+        padding: 5px 9px;
+        border-radius: 8px;
+    }
+
+    .auth-brand-title {
+        font-size: 15px;
+        font-weight: 800;
+        line-height: 1.1;
+    }
+
+    .auth-brand-sub {
+        font-size: 10.5px;
+        color: #94a3b8;
+    }
+
+    .auth-title {
+        font-size: 18px;
+        font-weight: 800;
+        margin-bottom: 3px;
+    }
+
+    .auth-sub {
+        font-size: 12px;
+        color: #64748b;
+        margin-bottom: 16px;
+    }
+
+    .auth-lbl {
+        display: block;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .4px;
+        text-transform: uppercase;
+        color: #64748b;
+        margin: 10px 0 4px;
+    }
+
+    .auth-inp {
+        width: 100%;
+        height: 38px;
+        border: 1px solid #cbd5e1;
+        border-radius: 9px;
+        background: #f8fafc;
+        padding: 0 12px;
+        font-size: 13px;
+        color: #0f172a;
+        outline: none;
+        box-sizing: border-box;
+    }
+
+        .auth-inp:focus {
+            border-color: #00a884;
+            background: #fff;
+        }
+
+    .auth-remember {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12.5px;
+        color: #334155;
+        margin-top: 12px;
+        cursor: pointer;
+    }
+
+    .auth-btn {
+        width: 100%;
+        height: 42px;
+        margin-top: 18px;
+        border: none;
+        border-radius: 10px;
+        background: #00a884;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+        .auth-btn:hover {
+            background: #029474;
+        }
+
+    .auth-error {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #b91c1c;
+        font-size: 12px;
+        border-radius: 8px;
+        padding: 8px 10px;
+        margin-top: 12px;
+    }
+
+    .auth-switch {
+        text-align: center;
+        font-size: 12px;
+        color: #64748b;
+        margin-top: 14px;
+    }
+
+    .auth-link {
+        color: #0284c7;
+        font-weight: 700;
+        cursor: pointer;
+        background: none;
+        border: none;
+        font-size: 12px;
+        font-family: inherit;
+        padding: 0;
+    }
+
+        .auth-link:hover {
+            text-decoration: underline;
+        }
+
+    .auth-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .ok-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(2,6,23,.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        padding: 20px;
+    }
+
+    .ok-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 26px 24px;
+        width: 100%;
+        max-width: 370px;
+        text-align: center;
+        box-shadow: 0 24px 60px rgba(0,0,0,.5);
+    }
+
+    .ok-emoji {
+        font-size: 40px;
+    }
+
+    .ok-title {
+        font-size: 17px;
+        font-weight: 800;
+        color: #0f172a;
+        margin-top: 8px;
+    }
+
+    .ok-text {
+        font-size: 12.5px;
+        color: #64748b;
+        margin-top: 6px;
+    }
+
+    @@media (max-width: 480px) {
+        .auth-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-brand">
+            <div class="auth-badge">МП</div>
+            <div>
+                <div class="auth-brand-title">М-Пласт</div>
+                <div class="auth-brand-sub">Логистика · Панель управления</div>
+            </div>
+        </div>
+
+        @if (!register)
+        {
+            <div class="auth-title">Вход</div>
+            <div class="auth-sub">Введите логин и пароль, чтобы продолжить</div>
+
+            <form @onsubmit="DoLogin" @onsubmit:preventDefault="true">
+                <label class="auth-lbl">Логин</label>
+                <input class="auth-inp" placeholder="Ваш логин" @bind="login" />
+
+                <label class="auth-lbl">Пароль</label>
+                <input class="auth-inp" type="password" placeholder="Ваш пароль" @bind="password" />
+
+                <label class="auth-remember">
+                    <input type="checkbox" @bind="rememberMe" /> Запомнить меня
+                </label>
+
+                @if (!string.IsNullOrEmpty(error))
+                {
+                    <div class="auth-error">@error</div>
+                }
+
+                <button type="submit" class="auth-btn">Войти</button>
+            </form>
+
+            <div class="auth-switch">
+                У вас ещё нет аккаунта?
+                <button type="button" class="auth-link" @onclick="GoRegister">Зарегистрироваться</button>
+            </div>
+        }
+        else
+        {
+            <div class="auth-title">Регистрация</div>
+            <div class="auth-sub">Заполните данные — карточка появится во вкладке «Сотрудники»</div>
+
+            <form @onsubmit="DoRegister" @onsubmit:preventDefault="true">
+                <label class="auth-lbl">ФИО</label>
+                <input class="auth-inp" placeholder="Иванов Иван Иванович" @bind="fio" />
+
+                <div class="auth-grid">
+                    <div>
+                        <label class="auth-lbl">Должность</label>
+                        <input class="auth-inp" placeholder="Логист" @bind="position" />
+                    </div>
+                    <div>
+                        <label class="auth-lbl">Номер телефона</label>
+                        <input class="auth-inp" placeholder="+7 900 000-00-00" @bind="phone" />
+                    </div>
+                </div>
+
+                <label class="auth-lbl">Email</label>
+                <input class="auth-inp" type="email" placeholder="you@mplast.ru" @bind="email" />
+
+                <div class="auth-grid">
+                    <div>
+                        <label class="auth-lbl">Логин</label>
+                        <input class="auth-inp" placeholder="ivanov" @bind="login" />
+                    </div>
+                    <div>
+                        <label class="auth-lbl">Пароль</label>
+                        <input class="auth-inp" type="password" placeholder="••••" @bind="password" />
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(error))
+                {
+                    <div class="auth-error">@error</div>
+                }
+
+                <button type="submit" class="auth-btn">Зарегистрироваться</button>
+            </form>
+
+            <div class="auth-switch">
+                Уже есть аккаунт?
+                <button type="button" class="auth-link" @onclick="GoLogin">Войти</button>
+            </div>
+        }
+    </div>
+</div>
+
+@if (welcome)
+{
+    <div class="ok-backdrop">
+        <div class="ok-card">
+            <div class="ok-emoji">🎉</div>
+            <div class="ok-title">Добро пожаловать в М-Пласт Логистика</div>
+            <div class="ok-text">
+                Аккаунт создан. Карточка добавлена во вкладку «Сотрудники»,
+                команда получила сообщение в чате.
+            </div>
+            <button type="button" class="auth-btn" @onclick="Continue">Продолжить</button>
+        </div>
+    </div>
+}
+
+@code {
+    bool register;
+    bool welcome;
+    string error = "";
+
+    string login = "";
+    string password = "";
+    string fio = "";
+    string position = "";
+    string phone = "";
+    string email = "";
+    bool rememberMe;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        // Автовход, если стоит «Запомнить меня»
+        try
+        {
+            var rem = await JS.InvokeAsync<string?>("localStorage.getItem", AuthStore.RememberKey);
+            if (rem == "1" && AuthStore.Current == null)
+            {
+                var l = await JS.InvokeAsync<string?>("localStorage.getItem", AuthStore.SavedLoginKey);
+                var p = await JS.InvokeAsync<string?>("localStorage.getItem", AuthStore.SavedPassKey);
+
+                if (!string.IsNullOrEmpty(l) && !string.IsNullOrEmpty(p) && AuthStore.Login(l, p))
+                {
+                    Nav.NavigateTo("/", forceLoad: true);
+                }
+            }
+        }
+        catch { }
+    }
+
+    void GoRegister() { register = true; error = ""; password = ""; }
+    void GoLogin() { register = false; error = ""; password = ""; }
+
+    async Task DoLogin()
+    {
+        error = "";
+
+        if (AuthStore.Login(login, password))
+        {
+            try
+            {
+                if (rememberMe)
+                {
+                    await JS.InvokeVoidAsync("localStorage.setItem", AuthStore.RememberKey, "1");
+                    await JS.InvokeVoidAsync("localStorage.setItem", AuthStore.SavedLoginKey, login.Trim());
+                    await JS.InvokeVoidAsync("localStorage.setItem", AuthStore.SavedPassKey, password);
+                }
+                else
+                {
+                    await JS.InvokeVoidAsync("localStorage.removeItem", AuthStore.RememberKey);
+                    await JS.InvokeVoidAsync("localStorage.removeItem", AuthStore.SavedLoginKey);
+                    await JS.InvokeVoidAsync("localStorage.removeItem", AuthStore.SavedPassKey);
+                }
+            }
+            catch { }
+
+            Nav.NavigateTo("/", forceLoad: true);
+            return;
+        }
+
+        error = AuthStore.Error ?? "Не удалось войти";
+    }
+
+    void DoRegister()
+    {
+        error = "";
+
+        if (AuthStore.Register(fio, position, phone, email, login, password, out var err))
+        {
+            welcome = true;
+            return;
+        }
+
+        error = err;
+    }
+
+    void Continue()
+    {
+        welcome = false;
+        Nav.NavigateTo("/", forceLoad: true);
+    }
+}

@@ -1,0 +1,27 @@
+﻿@page "/employee/{Id}"
+@rendermode InteractiveServer
+@inject NavigationManager Nav
+
+<div class="page-head"><h3>Карточка сотрудника</h3><a href="/employees" class="btn btn-ghost" style="text-decoration:none;line-height:42px">Назад</a></div>
+@if (emp == null)
+{
+    <div class="panel">Не найден</div>
+}
+else
+{
+    <div class="panel" style="max-width:520px">
+        <label class="lbl">ФИО</label><input @bind="emp.FullName" class="w100" /><br /><br />
+        <label class="lbl">Номер телефона</label><input @bind="emp.Phone" class="w100" /><br /><br />
+        <label class="lbl">Должность</label><input @bind="emp.Role" class="w100" />
+        <div class="row mt"><button class="btn" @onclick="Save">Сохранить</button></div>
+    </div>
+}
+@code {
+    [Parameter] public string Id { get; set; } = "";
+    Employee? emp;
+    protected override void OnInitialized()
+    {
+        emp = EmployeeStore.Employees.FirstOrDefault(x => x.Id.ToString() == Id);
+    }
+    void Save() { Nav.NavigateTo("/employees"); }
+}

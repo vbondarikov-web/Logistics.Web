@@ -1,0 +1,357 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@using Logistics.Web.Models
+@implements IDisposable
+
+<style>
+    /* Шапка */
+    .main-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #ffffff;
+        padding: 10px 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        gap: 15px;
+    }
+
+    .brand-section {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+
+    .brand-badge {
+        background: #00a884;
+        color: #fff;
+        font-weight: 800;
+        font-size: 14px;
+        padding: 6px 10px;
+        border-radius: 8px;
+    }
+
+    .brand-titles {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .brand-title {
+        font-weight: 800;
+        font-size: 15px;
+        color: #0f172a;
+    }
+
+    .brand-sub {
+        font-size: 11px;
+        color: #64748b;
+    }
+
+    /* Требование: надпись строго ЧЁРНЫМ цветом */
+    .welcome-line {
+        font-size: 13px;
+        color: #000000 !important;
+        font-weight: 700;
+        margin-left: 10px;
+    }
+
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .btn-header-notif {
+        background: #f1f5f9;
+        color: #334155;
+        border: none;
+        padding: 7px 14px;
+        border-radius: 20px;
+        font-size: 12.5px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+        .btn-header-notif:hover {
+            background: #e2e8f0;
+        }
+
+        .btn-header-notif.on {
+            background: #00a884;
+            color: #fff;
+        }
+
+    .notif-circle {
+        background: #ef4444;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        border-radius: 50%;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 4px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-header-logout {
+        background: #fff;
+        border: 1px solid #cbd5e1;
+        color: #334155;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 12.5px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+        .btn-header-logout:hover {
+            background: #fef2f2;
+            color: #b91c1c;
+            border-color: #fca5a5;
+        }
+
+    /* Раскладка */
+    .main-body {
+        display: flex;
+        min-height: calc(100vh - 56px);
+    }
+
+    .side-nav {
+        width: 210px;
+        min-width: 210px;
+        background: rgba(4, 20, 26, 0.95);
+        padding: 14px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        box-sizing: border-box;
+    }
+
+    .side-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #cbd5e1;
+        padding: 9px 12px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 500;
+        transition: 0.15s;
+    }
+
+        .side-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+        }
+
+        .side-item.active {
+            background: #00a884;
+            color: #ffffff;
+            font-weight: 700;
+        }
+
+    .chat-badge {
+        background: #ef4444;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        border-radius: 10px;
+        min-width: 17px;
+        height: 17px;
+        padding: 0 4px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: auto;
+    }
+
+    .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .dot-green {
+        background: #22c55e;
+    }
+
+    .dot-blue {
+        background: #3b82f6;
+    }
+
+    .dot-yellow {
+        background: #eab308;
+    }
+
+    .dot-teal {
+        background: #14b8a6;
+    }
+
+    .dot-orange {
+        background: #f97316;
+    }
+
+    .dot-purple {
+        background: #a855f7;
+    }
+
+    .dot-pink {
+        background: #ec4899;
+    }
+
+    .workspace {
+        flex: 1;
+        padding: 16px 20px;
+        overflow-y: auto;
+        min-width: 0;
+        background: radial-gradient(circle at 20% 20%, #0f4c52 0%, #08272c 55%, #04141a 100%);
+    }
+</style>
+
+<div class="app-container">
+    <header class="main-header">
+        <div class="brand-section">
+            <div class="brand-badge">МП</div>
+            <div class="brand-titles">
+                <span class="brand-title">М-Пласт</span>
+                <span class="brand-sub">Логистика · Панель управления</span>
+            </div>
+            @if (AuthStore.Current != null)
+            {
+                <span class="welcome-line">Добро пожаловать, @AuthStore.Current.FullName!</span>
+            }
+        </div>
+
+        <div class="header-actions">
+            <button type="button"
+                    class="btn-header-notif @(OnNotificationsPage ? "on" : "")"
+                    title="Уведомления"
+                    @onclick="OpenNotifications">
+                Уведомления
+                @if (Unread > 0)
+                {
+                    <span class="notif-circle">@(Unread > 99 ? "99+" : Unread.ToString())</span>
+                }
+            </button>
+
+            <button type="button" class="btn-header-logout" @onclick="Logout">Выйти</button>
+        </div>
+    </header>
+
+    <div class="main-body">
+        <aside class="side-nav">
+            <NavLink href="" Match="NavLinkMatch.All" class="side-item">
+                <span class="dot dot-green"></span> Заявки
+            </NavLink>
+            <NavLink href="clients" class="side-item">
+                <span class="dot dot-blue"></span> Наши клиенты
+            </NavLink>
+            <NavLink href="calculator" class="side-item">
+                <span class="dot dot-yellow"></span> Калькулятор
+            </NavLink>
+            <NavLink href="etrn" class="side-item">
+                <span class="dot dot-teal"></span> ЭтрН
+            </NavLink>
+            <NavLink href="ati" class="side-item">
+                <span class="dot dot-orange"></span> АТИ
+            </NavLink>
+            <NavLink href="chat" class="side-item">
+                <span class="dot dot-purple"></span> Чат
+                @if (ChatUnread > 0)
+                {
+                    <span class="chat-badge">@(ChatUnread > 99 ? "99+" : ChatUnread.ToString())</span>
+                }
+            </NavLink>
+            <NavLink href="employees" class="side-item">
+                <span class="dot dot-pink"></span> Сотрудники
+            </NavLink>
+        </aside>
+
+        <main class="workspace">
+            @Body
+        </main>
+    </div>
+</div>
+
+@code {
+    int Unread;
+    int ChatUnread;
+
+    bool OnNotificationsPage =>
+        (Nav.Uri ?? "").Contains("/notifications", StringComparison.OrdinalIgnoreCase);
+
+    protected override void OnInitialized()
+    {
+        Unread = NotificationStore.UnreadCount();
+        ChatUnread = ChatStore.UnreadTotal(AuthStore.Current?.FullName);
+        NotificationStore.Changed += Refresh;
+        ChatStore.Changed += Refresh;
+    }
+
+    void Refresh()
+    {
+        Unread = NotificationStore.UnreadCount();
+        ChatUnread = ChatStore.UnreadTotal(AuthStore.Current?.FullName);
+        InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        // Если не авторизован и не на логине - проверяем "Запомнить меня"
+        if (AuthStore.Current == null && !Nav.Uri.Contains("/login"))
+        {
+            try
+            {
+                var rem = await JS.InvokeAsync<string?>("localStorage.getItem", AuthStore.RememberKey);
+                if (rem == "1")
+                {
+                    var l = await JS.InvokeAsync<string?>("localStorage.getItem", AuthStore.SavedLoginKey);
+                    var p = await JS.InvokeAsync<string?>("localStorage.getItem", AuthStore.SavedPassKey);
+
+                    if (!string.IsNullOrEmpty(l) && !string.IsNullOrEmpty(p) && AuthStore.Login(l, p))
+                    {
+                        StateHasChanged();
+                        return;
+                    }
+                }
+            }
+            catch { }
+
+            Nav.NavigateTo("/login", forceLoad: true);
+        }
+    }
+
+    void OpenNotifications() => Nav.NavigateTo("/notifications");
+
+    async Task Logout()
+    {
+        AuthStore.Logout();
+
+        // Полное удаление сохранённого входа из браузера, чтобы не перелогинивало обратно
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.removeItem", AuthStore.RememberKey);
+            await JS.InvokeVoidAsync("localStorage.removeItem", AuthStore.SavedLoginKey);
+            await JS.InvokeVoidAsync("localStorage.removeItem", AuthStore.SavedPassKey);
+        }
+        catch { }
+
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
+
+    public void Dispose()
+    {
+        NotificationStore.Changed -= Refresh;
+        ChatStore.Changed -= Refresh;
+    }
+}

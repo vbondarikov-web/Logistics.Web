@@ -1,0 +1,1129 @@
+﻿@page "/ati"
+@using System.Text.Json
+@using Logistics.Web.Models
+@using Logistics.Web.Services
+@inject AtiService Svc
+
+<style>
+    .ati-tabs {
+        margin: 14px 0;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+        .ati-tabs button {
+            padding: 8px 18px;
+            border: 1px solid rgba(255,255,255,.15);
+            background: rgba(255,255,255,.06);
+            color: #cfe3e0;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+            .ati-tabs button:hover {
+                background: rgba(255,255,255,.12);
+            }
+
+            .ati-tabs button.on {
+                background: #10b981;
+                border-color: #10b981;
+                color: #fff;
+            }
+
+    .ati-msg {
+        margin: 12px 0;
+        padding: 10px 14px;
+        border-radius: 8px;
+        white-space: pre-wrap;
+        background: rgba(16,185,129,.15);
+        border: 1px solid rgba(16,185,129,.4);
+        color: #d1fae5;
+    }
+
+        .ati-msg.err {
+            background: rgba(239,68,68,.15);
+            border-color: rgba(239,68,68,.45);
+            color: #fecaca;
+        }
+
+    .ati-card {
+        display: flex;
+        gap: 14px;
+        border: 1px solid rgba(255,255,255,.1);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 12px;
+        background: rgba(255,255,255,.05);
+        color: #e6f1f0;
+        max-width: 1000px;
+    }
+
+        .ati-card:hover {
+            border-color: rgba(16,185,129,.5);
+        }
+
+        .ati-card .main {
+            flex: 1;
+            line-height: 1.55;
+        }
+
+        .ati-card input[type=checkbox] {
+            width: 18px;
+            height: 18px;
+            margin-top: 4px;
+            accent-color: #10b981;
+        }
+
+    .ati-route {
+        font-size: 1.15em;
+        font-weight: 700;
+        color: #fff;
+    }
+
+    .ati-muted {
+        color: #8fa9a6;
+        font-size: .85em;
+        font-weight: normal;
+    }
+
+    .ati-rate {
+        font-weight: 700;
+        color: #34d399;
+    }
+
+    .ati-actions button {
+        margin: 8px 8px 0 0;
+        padding: 5px 12px;
+        border: 1px solid rgba(255,255,255,.2);
+        background: transparent;
+        color: #e6f1f0;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+
+        .ati-actions button:hover:not(:disabled) {
+            background: rgba(16,185,129,.25);
+            border-color: #10b981;
+        }
+
+        .ati-actions button:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
+
+    .ati-actions .ati-muted {
+        margin-right: 8px;
+    }
+
+    .ati-sec {
+        max-width: 1000px;
+        margin-bottom: 14px;
+        padding: 14px 16px 16px;
+        border: 1px solid rgba(255,255,255,.1);
+        border-radius: 12px;
+        background: rgba(255,255,255,.04);
+    }
+
+        .ati-sec h4 {
+            margin: 0 0 10px;
+            font-size: .95em;
+            color: #34d399;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+        }
+
+    .ati-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 12px;
+    }
+
+    .ati-field label {
+        display: block;
+        margin-bottom: 4px;
+        font-size: .82em;
+        color: #a9c3c0;
+    }
+
+    .ati-field input, .ati-field select, .ati-field textarea {
+        width: 100%;
+        padding: 8px 10px;
+        box-sizing: border-box;
+        border: 1px solid rgba(255,255,255,.18);
+        border-radius: 8px;
+        background: #0f2a30;
+        color: #fff;
+        color-scheme: dark;
+        font: inherit;
+    }
+
+        .ati-field input::placeholder {
+            color: #6f8a87;
+        }
+
+        .ati-field input:focus, .ati-field select:focus, .ati-field textarea:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 2px rgba(16,185,129,.25);
+        }
+
+    .ati-field.wide {
+        grid-column: 1 / -1;
+    }
+
+    .ati-city {
+        position: relative;
+    }
+
+    .ati-sug {
+        position: absolute;
+        z-index: 50;
+        top: 100%;
+        left: 0;
+        right: 0;
+        margin-top: 4px;
+        background: #12343b;
+        border: 1px solid #10b981;
+        border-radius: 8px;
+        max-height: 240px;
+        overflow-y: auto;
+        box-shadow: 0 8px 24px rgba(0,0,0,.5);
+    }
+
+        .ati-sug div {
+            padding: 8px 10px;
+            cursor: pointer;
+            color: #e6f1f0;
+            border-bottom: 1px solid rgba(255,255,255,.06);
+        }
+
+            .ati-sug div:last-child {
+                border-bottom: none;
+            }
+
+            .ati-sug div:hover {
+                background: #10b981;
+                color: #fff;
+            }
+
+    .ati-btn {
+        padding: 8px 18px;
+        margin: 4px 8px 12px 0;
+        border: 1px solid rgba(255,255,255,.2);
+        background: rgba(255,255,255,.06);
+        color: #e6f1f0;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+
+        .ati-btn:hover:not(:disabled) {
+            background: rgba(255,255,255,.14);
+        }
+
+        .ati-btn.primary {
+            background: #10b981;
+            border-color: #10b981;
+            color: #fff;
+        }
+
+            .ati-btn.primary:hover:not(:disabled) {
+                background: #0ea371;
+            }
+
+        .ati-btn:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+
+    .ati-raw {
+        max-width: 1000px;
+        background: #071518;
+        color: #cfe3e0;
+        border: 1px solid rgba(255,255,255,.1);
+        padding: 12px;
+        border-radius: 8px;
+        max-height: 420px;
+        overflow: auto;
+        white-space: pre-wrap;
+        font-size: .8em;
+    }
+</style>
+
+<h3>
+    ATI.SU
+    @if (account != null)
+    {
+        <span class="ati-muted">@account.FirmName (код @account.AtiId)</span>
+    }
+</h3>
+
+@if (Svc.IsExpired)
+{
+    <div class="ati-msg err">Срок действия токена ATI истёк @Svc.ExpiresAt.ToString("dd.MM.yyyy"). Обновите токен в appsettings.json.</div>
+}
+else if (!Svc.IsConfigured)
+{
+    <div class="ati-msg err">ATI не настроен: проверьте раздел Ati в appsettings.json.</div>
+}
+else
+{
+    @if (Svc.IsDryRun)
+    {
+        <div class="ati-msg">Режим DryRun: в ATI ничего не отправляется.</div>
+    }
+
+    <div class="ati-tabs">
+        <button class="@(tab == "list" ? "on" : "")" @onclick='() => tab = "list"'>Мои грузы (@loads.Count)</button>
+        <button class="@(tab == "form" ? "on" : "")" @onclick='() => tab = "form"'>@(editId != null ? "Редактирование" : "Выставить груз")</button>
+        <button class="@(tab == "other" ? "on" : "")" @onclick='() => tab = "other"'>Площадки и предложения</button>
+    </div>
+
+    @if (msg.Length > 0)
+    {
+        <div class="ati-msg @(msgError ? "err" : "")">@msg</div>
+    }
+
+    @if (tab == "list")
+    {
+        <div>
+            <button class="ati-btn" disabled="@busy" @onclick="() => Run(LoadCargos)">Обновить список</button>
+            <button class="ati-btn primary" disabled="@(busy || selected.Count == 0)" @onclick="() => Run(RefreshSelected)">
+                Поднять выбранные (@selected.Count)
+            </button>
+        </div>
+
+        @if (loads.Count == 0)
+        {
+            <p class="ati-muted">Опубликованных грузов нет.</p>
+        }
+
+        @foreach (var l in loads)
+        {
+            <div class="ati-card">
+                <div>
+                    <input type="checkbox"
+                           checked="@selected.Contains(l.Id)"
+                           disabled="@(!l.CanBeRenewed)"
+                           title="@(l.CanBeRenewed ? "Поднять в топ" : l.RenewRestriction)"
+                           @onchange="e => Toggle(l.Id, e.Value is true)" />
+                </div>
+                <div class="main">
+                    <div class="ati-route">
+                        @Svc.CityName(l.LoadingCityId) → @Svc.CityName(l.UnloadingCityId)
+                        @if (l.Distance > 0)
+                        {
+                            <span class="ati-muted">@l.Distance км</span>
+                        }
+                    </div>
+                    <div>
+                        @l.CargoName
+                        @if (l.Weight > 0)
+                        {
+                            <span> · @l.Weight.ToString("0.###") т</span>
+                        }
+                        @if (l.Volume > 0)
+                        {
+                            <span> · @l.Volume.ToString("0.###") м³</span>
+                        }
+                        @if (Svc.BodyNames(l.CarTypeMask).Length > 0)
+                        {
+                            <span> · @Svc.BodyNames(l.CarTypeMask)</span>
+                        }
+                    </div>
+                    <div><span class="ati-rate">@RateText(l)</span> · @DateText(l)</div>
+                    <div class="ati-muted">
+                        № @l.Number
+                        @if (l.AddedAt != null)
+                        {
+                            <span> · добавлен @l.AddedAt.Value.ToString("dd.MM HH:mm")</span>
+                        }
+                        @if (l.OfferCount > 0)
+                        {
+                            <span> · предложений: @l.OfferCount</span>
+                        }
+                    </div>
+                    @if (l.Note.Length > 0)
+                    {
+                        <div class="ati-muted">@l.Note</div>
+                    }
+                    @if (!l.CanBeRenewed && l.RenewRestriction.Length > 0)
+                    {
+                        <div class="ati-muted">@l.RenewRestriction</div>
+                    }
+                    @if (refreshErrors.TryGetValue(l.Id, out var rerr))
+                    {
+                        <div class="ati-muted" style="color:#fca5a5">Не поднят: @rerr</div>
+                    }
+                    <div class="ati-actions">
+                        @if (confirmArchiveId == l.Id)
+                        {
+                            <span class="ati-muted">Снять груз с публикации?</span>
+                            <button disabled="@busy" @onclick="() => Run(() => ArchiveLoad(l))">Да, в архив</button>
+                            <button @onclick="() => confirmArchiveId = null">Отмена</button>
+                        }
+                        else
+                        {
+                            <button disabled="@(busy || !l.CanBeEdited)" @onclick="() => Run(() => OpenDraft(l, true))">Редактировать</button>
+                            <button disabled="@busy" @onclick="() => Run(() => OpenDraft(l, false))">Копировать</button>
+                            <button disabled title="Нужна документация ATI по поиску транспорта">Найти машину</button>
+                            <button disabled="@busy" @onclick="() => confirmArchiveId = l.Id">В архив</button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    @if (tab == "form")
+    {
+        @if (editId != null)
+        {
+            <div class="ati-msg">
+                Редактируется груз № @editNumber. ATI сохраняет груз целиком из этой формы:
+                то, чего в форме нет (промежуточные точки, время и даты разгрузки, доп. требования к машине), будет сброшено.
+            </div>
+        }
+
+        <div class="ati-sec">
+            <h4>Загрузка</h4>
+            <div class="ati-grid">
+                <div class="ati-field ati-city">
+                    <label>Город</label>
+                    <input value="@loadQuery" placeholder="Начните вводить" autocomplete="off" @oninput="e => SearchCity(true, e.Value?.ToString())" />
+                    @if (loadSug.Count > 0)
+                    {
+                        <div class="ati-sug">
+                            @foreach (var s in loadSug)
+                            {
+                                <div @onclick="() => PickCity(true, s)">@s.Address</div>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="ati-field"><label>Адрес</label><input @bind="draft.LoadingAddress" /></div>
+                <div class="ati-field"><label>Дата</label><input type="date" @bind="draft.LoadingDate" /></div>
+            </div>
+        </div>
+
+        <div class="ati-sec">
+            <h4>Разгрузка</h4>
+            <div class="ati-grid">
+                <div class="ati-field ati-city">
+                    <label>Город</label>
+                    <input value="@unloadQuery" placeholder="Начните вводить" autocomplete="off" @oninput="e => SearchCity(false, e.Value?.ToString())" />
+                    @if (unloadSug.Count > 0)
+                    {
+                        <div class="ati-sug">
+                            @foreach (var s in unloadSug)
+                            {
+                                <div @onclick="() => PickCity(false, s)">@s.Address</div>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="ati-field"><label>Адрес</label><input @bind="draft.UnloadingAddress" /></div>
+            </div>
+        </div>
+
+        <div class="ati-sec">
+            <h4>Груз и машина</h4>
+            <div class="ati-grid">
+                <div class="ati-field"><label>Груз</label><input @bind="draft.CargoName" /></div>
+                <div class="ati-field"><label>Вес, т</label><input type="number" step="any" @bind="draft.Weight" /></div>
+                <div class="ati-field"><label>Объём, м³</label><input type="number" step="any" @bind="draft.Volume" /></div>
+                <div class="ati-field">
+                    <label>Кузов</label>
+                    <select @bind="draft.BodyTypeId">
+                        <option value="0">— выберите —</option>
+                        @foreach (var t in carTypes)
+                        {
+                            <option value="@Svc.BodyValue(t)">@t.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="ati-field"><label>Машин</label><input type="number" min="1" @bind="draft.TrucksCount" /></div>
+                <div class="ati-field">
+                    <label>Загрузка</label>
+                    <select @bind="draft.LoadType">
+                        <option value="ftl">Отдельной машиной</option>
+                        <option value="ltl">Догрузом</option>
+                        <option value="dont-care">Не важно</option>
+                    </select>
+                </div>
+                <div class="ati-field"><label>Грузоподъёмность, т</label><input type="number" step="any" @bind="draft.RequiredCapacity" /></div>
+            </div>
+        </div>
+
+        <div class="ati-sec">
+            <h4>Оплата</h4>
+            <div class="ati-grid">
+                <div class="ati-field">
+                    <label>Тип</label>
+                    <select @bind="draft.PaymentType">
+                        <option value="without-bargaining">Без торга</option>
+                        <option value="with-bargaining">Возможен торг</option>
+                        <option value="rate-request">Запрос ставки</option>
+                    </select>
+                </div>
+                <div class="ati-field"><label>Ставка без НДС</label><input type="number" step="any" @bind="draft.RateWithoutVat" /></div>
+                <div class="ati-field"><label>Ставка с НДС</label><input type="number" step="any" @bind="draft.RateWithVat" /></div>
+                <div class="ati-field"><label>НДС, %</label><input type="number" placeholder="не указан" @bind="draft.VatPercent" /></div>
+                <div class="ati-field"><label>Наличными</label><input type="number" step="any" @bind="draft.Cash" /></div>
+            </div>
+        </div>
+
+        <div class="ati-sec">
+            <h4>Контакт и публикация</h4>
+            <div class="ati-grid">
+                <div class="ati-field">
+                    <label>Контакт</label>
+                    <select @bind="draft.ContactId">
+                        @if (account != null)
+                        {
+                            @foreach (var c in account.Contacts)
+                            {
+                                <option value="@c.Id">@c.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="ati-field"><label>ID площадки</label><input placeholder="пусто — общая" @bind="draft.BoardId" /></div>
+                <div class="ati-field wide"><label>Примечание</label><textarea rows="2" @bind="draft.Note"></textarea></div>
+            </div>
+        </div>
+
+        <div>
+            <button class="ati-btn primary" disabled="@busy" @onclick="() => Run(Submit)">@(editId != null ? "Сохранить изменения" : "Опубликовать")</button>
+            <button class="ati-btn" disabled="@busy" @onclick="Preview">Проверить и показать JSON</button>
+            <button class="ati-btn" disabled="@busy" @onclick="ResetForm">@(editId != null ? "Отменить редактирование" : "Очистить")</button>
+        </div>
+    }
+
+    @if (tab == "other")
+    {
+        <div>
+            <button class="ati-btn primary" disabled="@busy" @onclick="() => Run(LoadCounterOffers)">Встречные предложения</button>
+            <button class="ati-btn" disabled="@busy" @onclick="() => Run(LoadCounterOffersRaw)">Предложения (JSON)</button>
+        </div>
+
+        @if (offersLoaded && offers.Count == 0)
+        {
+            <p class="ati-muted">Встречных предложений нет.</p>
+        }
+
+        @foreach (var o in offers)
+        {
+            var load = loads.FirstOrDefault(x => x.Id == o.CargoId);
+
+            <div class="ati-card">
+                <div class="main">
+                    <div class="ati-route">
+                        @o.FirmName
+                        @if (o.Score > 0)
+                        {
+                            <span class="ati-muted">★ @o.Score.ToString("0.#")</span>
+                        }
+                        @if (o.IsOutdated)
+                        {
+                            <span class="ati-muted">· устарело</span>
+                        }
+                    </div>
+                    <div><span class="ati-rate">@OfferRateText(o)</span></div>
+                    <div class="ati-muted">
+                        Груз № @o.CargoNumber
+                        @if (load != null)
+                        {
+                            <span> · @Svc.CityName(load.LoadingCityId) → @Svc.CityName(load.UnloadingCityId)</span>
+                        }
+                        @if (o.LoadingDate != null)
+                        {
+                            <span> · заберут @o.LoadingDate.Value.ToString("dd.MM")</span>
+                        }
+                        @if (o.AddedAt != null)
+                        {
+                            <span> · получено @o.AddedAt.Value.ToString("dd.MM HH:mm")</span>
+                        }
+                    </div>
+                    @if (o.ContactName.Length > 0 || o.Phone.Length > 0)
+                    {
+                        <div>
+                            @o.ContactName
+                            @if (o.Phone.Length > 0)
+                            {
+                                <a href="tel:@o.Phone" style="color:#34d399; margin-left:8px">@o.Phone</a>
+                            }
+                        </div>
+                    }
+                    @if (o.Note.Length > 0)
+                    {
+                        <div class="ati-muted">@o.Note</div>
+                    }
+                    <div class="ati-actions">
+                        @if (confirmOfferId == o.Id)
+                        {
+                            <button disabled="@busy" @onclick="() => Run(() => DeleteOffer(o))">Да, удалить</button>
+                            <button @onclick="() => confirmOfferId = null">Отмена</button>
+                        }
+                        else
+                        {
+                            <button disabled="@busy" @onclick="() => confirmOfferId = o.Id">Удалить</button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="ati-sec" style="margin-top:18px">
+            <h4>Поиск по площадкам</h4>
+            <div class="ati-field">
+                <label>ID площадок через запятую (пусто — все закрытые площадки)</label>
+                <input @bind="boardIdsText" />
+            </div>
+            <button class="ati-btn primary" style="margin-top:10px" disabled="@busy" @onclick="() => Run(SearchBoards)">Искать</button>
+            <button class="ati-btn" style="margin-top:10px" disabled="@busy" @onclick="() => Run(SearchBoardsRaw)">Результат (JSON)</button>
+        </div>
+
+        @if (boardSearched)
+        {
+            <p class="ati-muted">Найдено: @boardTotal, показано: @boardCargos.Count</p>
+        }
+
+        @foreach (var bc in boardCargos)
+        {
+            <div class="ati-card">
+                <div class="main">
+                    <div class="ati-route">
+                        @Svc.CityName(bc.LoadingCityId) → @Svc.CityName(bc.UnloadingCityId)
+                        @if (bc.Distance > 0)
+                        {
+                            <span class="ati-muted">@bc.Distance км</span>
+                        }
+                    </div>
+                    <div>
+                        @bc.CargoName
+                        @if (bc.Weight > 0)
+                        {
+                            <span> · @bc.Weight.ToString("0.###") т</span>
+                        }
+                        @if (bc.Volume > 0)
+                        {
+                            <span> · @bc.Volume.ToString("0.###") м³</span>
+                        }
+                        @if (Svc.BodyNamesByTypeIds(bc.BodyTypeIds).Length > 0)
+                        {
+                            <span> · @Svc.BodyNamesByTypeIds(bc.BodyTypeIds)</span>
+                        }
+                    </div>
+                    <div><span class="ati-rate">@BoardRateText(bc)</span> · @BoardDateText(bc)</div>
+                    @if (bc.LoadingAddress.Length > 0 || bc.UnloadingAddress.Length > 0)
+                    {
+                        <div class="ati-muted">@bc.LoadingAddress → @bc.UnloadingAddress</div>
+                    }
+                    <div class="ati-muted">
+                        № @bc.Number
+                        @if (bc.AtiId > 0)
+                        {
+                            <span> · код АТИ @bc.AtiId</span>
+                        }
+                        @if (bc.AddedAt != null)
+                        {
+                            <span> · добавлен @bc.AddedAt.Value.ToString("dd.MM HH:mm")</span>
+                        }
+                        @if (bc.OfferCount > 0)
+                        {
+                            <span> · предложений: @bc.OfferCount</span>
+                        }
+                    </div>
+                    @if (bc.Note.Length > 0)
+                    {
+                        <div class="ati-muted">@bc.Note</div>
+                    }
+
+                    @if (offerCargoId == bc.Id)
+                    {
+                        <div class="ati-grid" style="margin-top:10px">
+                            <div class="ati-field"><label>Ставка с НДС</label><input type="number" step="any" @bind="offerDraft.NdsPrice" /></div>
+                            <div class="ati-field"><label>Ставка без НДС</label><input type="number" step="any" @bind="offerDraft.NotNdsPrice" /></div>
+                            <div class="ati-field"><label>Наличными</label><input type="number" step="any" @bind="offerDraft.Price" /></div>
+                            <div class="ati-field"><label>Дата загрузки</label><input type="date" @bind="offerDraft.LoadingDate" /></div>
+                            <div class="ati-field wide"><label>Примечание</label><input @bind="offerDraft.Note" /></div>
+                        </div>
+                        <div class="ati-actions">
+                            <button disabled="@busy" @onclick="() => Run(() => SendOffer(bc))">Отправить предложение</button>
+                            <button @onclick="() => offerCargoId = null">Отмена</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="ati-actions">
+                            @if (sentOffers.Contains(bc.Id))
+                            {
+                                <span class="ati-muted">Предложение отправлено</span>
+                            }
+                            <button disabled="@busy" @onclick="() => OpenOffer(bc)">Сделать предложение</button>
+                        </div>
+                    }
+
+                </div>
+            </div>
+        }
+
+        @if (boardSearched && boardSkip < boardTotal && boardSkip + 100 <= 10000)
+        {
+            <button class="ati-btn" disabled="@busy" @onclick="() => Run(MoreBoards)">Показать ещё</button>
+        }
+    }
+
+    @if (raw.Length > 0 && tab != "list")
+    {
+        <pre class="ati-raw">@raw</pre>
+    }
+}
+
+@code {
+    private static readonly JsonSerializerOptions PrettyJson = new()
+    {
+        WriteIndented = true,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
+    private string tab = "list";
+    private bool busy;
+    private string msg = "";
+    private bool msgError;
+    private string raw = "";
+
+    private AtiAccount? account;
+    private List<AtiCarType> carTypes = new();
+    private List<AtiLoad> loads = new();
+    private readonly HashSet<string> selected = new();
+    private Dictionary<string, string> refreshErrors = new();
+
+    private AtiCargoDraft draft = new();
+    private string? editId;
+    private string editNumber = "";
+
+    private string loadQuery = "";
+    private string unloadQuery = "";
+    private List<AtiCitySuggestion> loadSug = new();
+    private List<AtiCitySuggestion> unloadSug = new();
+    private string boardIdsText = "";
+
+    private List<AtiOffer> offers = new();
+    private bool offersLoaded;
+    private string? confirmOfferId;
+    private string? confirmArchiveId;
+
+    private List<AtiBoardCargo> boardCargos = new();
+    private List<string> boardSearchIds = new();
+    private int boardTotal;
+    private int boardSkip;
+    private bool boardSearched;
+
+    private string? offerCargoId;
+    private AtiOfferDraft offerDraft = new();
+    private readonly HashSet<string> sentOffers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Svc.IsConfigured) return;
+
+        await Run(async () =>
+        {
+            carTypes = await Svc.GetCarTypesAsync();
+            account = await Svc.GetAccountAsync();
+            draft.ContactId = account.CurrentContactId;
+            await LoadCargos();
+        });
+    }
+
+    private async Task Run(Func<Task> action)
+    {
+        busy = true;
+        msg = "";
+        msgError = false;
+
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            msg = ex.Message;
+            msgError = true;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    // ---------- Мои грузы ----------
+
+    private async Task LoadCargos()
+    {
+        loads = await Svc.GetMyCargosAsync();
+        selected.IntersectWith(loads.Where(l => l.CanBeRenewed).Select(l => l.Id));
+    }
+
+    private void Toggle(string id, bool on)
+    {
+        if (on) selected.Add(id);
+        else selected.Remove(id);
+    }
+
+    private async Task RefreshSelected()
+    {
+        var result = await Svc.RefreshCargosAsync(selected);
+        var ok = result.Count(r => r.Value.Length == 0);
+
+        refreshErrors = result.Where(r => r.Value.Length > 0)
+                              .ToDictionary(r => r.Key, r => r.Value);
+        selected.Clear();
+
+        if (!Svc.IsDryRun) await LoadCargos();
+
+        msg = "Поднято: " + ok + " из " + result.Count +
+              (refreshErrors.Count > 0 ? ". Причины отказа указаны в карточках." : ".");
+        msgError = ok == 0;
+    }
+
+    private async Task ArchiveLoad(AtiLoad l)
+    {
+        confirmArchiveId = null;
+
+        var result = await Svc.ArchiveCargosAsync(new[] { l.Id });
+
+        if (Svc.IsDryRun)
+        {
+            msg = "DryRun: запрос на архивацию не отправлен.";
+            return;
+        }
+
+        if (result.TryGetValue(l.Id, out var err) && err.Length > 0)
+        {
+            throw new InvalidOperationException("ATI не отправил груз в архив: " + err);
+        }
+
+        selected.Remove(l.Id);
+        await LoadCargos();
+        msg = "Груз № " + l.Number + " отправлен в архив.";
+    }
+
+    private async Task OpenDraft(AtiLoad l, bool edit)
+    {
+        draft = await Svc.GetCargoDraftAsync(l.Id);
+
+        if (draft.ContactId == 0 && account != null) draft.ContactId = account.CurrentContactId;
+
+        if (edit)
+        {
+            editId = l.Id;
+            editNumber = l.Number;
+        }
+        else
+        {
+            editId = null;
+            editNumber = "";
+            draft.CargoId = 0;
+        }
+
+        loadQuery = draft.LoadingCityName;
+        unloadQuery = draft.UnloadingCityName;
+        loadSug.Clear();
+        unloadSug.Clear();
+        raw = "";
+        tab = "form";
+    }
+
+    private static string RateText(AtiLoad l)
+    {
+        if (!l.FixedRate) return "Запрос ставки";
+
+        var parts = new List<string>();
+        if (l.SumWithNds > 0) parts.Add(l.SumWithNds.ToString("N0") + " с НДС");
+        if (l.SumWithoutNds > 0) parts.Add(l.SumWithoutNds.ToString("N0") + " без НДС");
+        if (l.RateSum > 0) parts.Add(l.RateSum.ToString("N0") + " нал");
+        if (parts.Count == 0) return "Ставка не указана";
+
+        return string.Join(" / ", parts) + (l.Torg ? " (торг)" : "");
+    }
+
+    private static string DateText(AtiLoad l)
+    {
+        switch (l.DateType)
+        {
+            case 0: return "готов к загрузке";
+            case 2: return "постоянно";
+            case 3: return "груза нет, запрос ставки";
+        }
+
+        if (l.FirstDate == null) return "";
+
+        var text = l.FirstDate.Value.ToString("dd.MM");
+        if (l.LastDate != null && l.LastDate != l.FirstDate)
+        {
+            text += "–" + l.LastDate.Value.ToString("dd.MM");
+        }
+
+        return text;
+    }
+
+    // ---------- Форма ----------
+
+    private async Task SearchCity(bool loading, string? text)
+    {
+        text ??= "";
+
+        if (loading)
+        {
+            loadQuery = text;
+            draft.LoadingCityId = 0;
+        }
+        else
+        {
+            unloadQuery = text;
+            draft.UnloadingCityId = 0;
+        }
+
+        if (text.Trim().Length < 2)
+        {
+            if (loading) loadSug.Clear();
+            else unloadSug.Clear();
+            return;
+        }
+
+        try
+        {
+            var found = await Svc.SearchCitiesAsync(text);
+
+            // ответ на устаревший ввод не показываем
+            if (loading && loadQuery == text) loadSug = found;
+            if (!loading && unloadQuery == text) unloadSug = found;
+        }
+        catch (Exception ex)
+        {
+            msg = ex.Message;
+            msgError = true;
+        }
+    }
+
+    private void PickCity(bool loading, AtiCitySuggestion s)
+    {
+        if (loading)
+        {
+            draft.LoadingCityId = s.CityId;
+            draft.LoadingRegionId = s.RegionId;
+            if (s.CountryId > 0) draft.LoadingCountryId = s.CountryId;
+            draft.LoadingCityName = s.Name;
+            loadQuery = s.Address;
+            loadSug.Clear();
+        }
+        else
+        {
+            draft.UnloadingCityId = s.CityId;
+            draft.UnloadingRegionId = s.RegionId;
+            if (s.CountryId > 0) draft.UnloadingCountryId = s.CountryId;
+            draft.UnloadingCityName = s.Name;
+            unloadQuery = s.Address;
+            unloadSug.Clear();
+        }
+    }
+
+    private void Preview()
+    {
+        var problems = AtiService.Validate(draft);
+        raw = Svc.PreviewJson(draft);
+        msg = problems.Count == 0 ? "Ошибок в форме нет." : "• " + string.Join("\n• ", problems);
+        msgError = problems.Count > 0;
+    }
+
+    private async Task Submit()
+    {
+        var editing = editId != null;
+
+        var answer = editing
+            ? await Svc.UpdateCargoAsync(editId!, draft)
+            : await Svc.CreateCargoAsync(draft);
+
+        if (Svc.IsDryRun)
+        {
+            raw = answer;
+            msg = "DryRun: запрос не отправлен, тело показано ниже.";
+            return;
+        }
+
+        ResetForm();
+        await LoadCargos();
+        tab = "list";
+        msg = editing ? "Изменения сохранены." : "Груз опубликован.";
+    }
+
+    private void ResetForm()
+    {
+        draft = new AtiCargoDraft { ContactId = account?.CurrentContactId ?? 0 };
+        editId = null;
+        editNumber = "";
+        loadQuery = "";
+        unloadQuery = "";
+        loadSug.Clear();
+        unloadSug.Clear();
+        raw = "";
+    }
+
+    // ---------- Встречные предложения ----------
+
+    private async Task LoadCounterOffers()
+    {
+        raw = "";
+        offers = await Svc.GetCounterOffersAsync();
+        offersLoaded = true;
+        confirmOfferId = null;
+    }
+
+    private async Task LoadCounterOffersRaw()
+    {
+        raw = Pretty(await Svc.GetCounterOffersRawAsync());
+    }
+
+    private async Task DeleteOffer(AtiOffer o)
+    {
+        confirmOfferId = null;
+
+        if (Svc.IsDryRun)
+        {
+            msg = "DryRun: запрос на удаление не отправлен.";
+            return;
+        }
+
+        await Svc.DeleteCounterOfferAsync(o.CargoId, o.Id);
+        offers.Remove(o);
+        msg = "Предложение удалено.";
+    }
+
+    private static string OfferRateText(AtiOffer o)
+    {
+        if (o.IsNoLoad) return "Отметка «груза нет»";
+
+        var parts = new List<string>();
+        if (o.NdsPrice > 0)
+        {
+            parts.Add(o.NdsPrice.ToString("N0") + " с НДС" +
+                      (o.NdsPercent > 0 ? " " + o.NdsPercent.ToString("0.#") + "%" : ""));
+        }
+        if (o.NotNdsPrice > 0) parts.Add(o.NotNdsPrice.ToString("N0") + " без НДС");
+        if (o.Price > 0) parts.Add(o.Price.ToString("N0") + " нал");
+
+        return parts.Count == 0 ? "Ставка не указана" : string.Join(" / ", parts);
+    }
+
+    // ---------- Поиск по площадкам ----------
+
+    private List<string> ParseBoardIds()
+        => boardIdsText
+            .Split(new[] { ',', ' ', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .ToList();
+
+    private async Task SearchBoards()
+    {
+        raw = "";
+        boardSearchIds = ParseBoardIds();
+
+        var result = await Svc.SearchCargosAsync(boardSearchIds, 0);
+        boardCargos = result.Items;
+        boardTotal = result.Total;
+        boardSkip = 100;
+        boardSearched = true;
+    }
+
+    private async Task MoreBoards()
+    {
+        var result = await Svc.SearchCargosAsync(boardSearchIds, boardSkip);
+
+        var known = boardCargos.Select(c => c.Id).ToHashSet();
+        boardCargos.AddRange(result.Items.Where(c => known.Add(c.Id)));
+        boardTotal = result.Total;
+        boardSkip += 100;
+    }
+
+    private async Task SearchBoardsRaw()
+    {
+        raw = Pretty(await Svc.SearchCargoRawAsync(ParseBoardIds()));
+    }
+
+    private void OpenOffer(AtiBoardCargo c)
+    {
+        offerCargoId = c.Id;
+        offerDraft = new AtiOfferDraft
+        {
+            LoadingDate = c.FirstDate >= DateTime.Today ? c.FirstDate : DateTime.Today
+        };
+        raw = "";
+    }
+
+    private async Task SendOffer(AtiBoardCargo c)
+    {
+        var answer = await Svc.CreateCounterOfferAsync(c.Id, offerDraft);
+
+        if (Svc.IsDryRun)
+        {
+            raw = answer;
+            msg = "DryRun: предложение не отправлено, тело показано внизу страницы.";
+            return;
+        }
+
+        sentOffers.Add(c.Id);
+        offerCargoId = null;
+        msg = "Предложение по грузу № " + c.Number + " отправлено.";
+    }
+
+
+    private static string BoardRateText(AtiBoardCargo c)
+    {
+        if (c.PaymentType == "auction") return "Торги";
+        if (c.PaymentType == "rate-request") return "Запрос ставки";
+
+        var parts = new List<string>();
+        if (c.RateWithVat > 0) parts.Add(c.RateWithVat.ToString("N0") + " с НДС");
+        if (c.RateWithoutVat > 0) parts.Add(c.RateWithoutVat.ToString("N0") + " без НДС");
+        if (c.Cash > 0) parts.Add(c.Cash.ToString("N0") + " нал");
+
+        var torg = c.PaymentType == "with-bargaining" ? " (торг)" : "";
+        return parts.Count == 0
+            ? (torg.Length > 0 ? "Ставка с торгом" : "Ставка без торга")
+            : string.Join(" / ", parts) + torg;
+    }
+
+    private static string BoardDateText(AtiBoardCargo c)
+    {
+        if (c.DateType == "permanent") return "постоянно";
+        if (c.DateType == "rate-request") return "груза нет, запрос ставки";
+
+        var text = c.DateType == "ready" ? "готов к загрузке" : "";
+        if (c.FirstDate == null) return text;
+
+        var dates = c.FirstDate.Value.ToString("dd.MM");
+        if (c.LastDate != null && c.LastDate != c.FirstDate)
+        {
+            dates += "–" + c.LastDate.Value.ToString("dd.MM");
+        }
+
+        return text.Length > 0 ? text + ", " + dates : dates;
+    }
+
+    private static string Pretty(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return JsonSerializer.Serialize(doc.RootElement, PrettyJson);
+        }
+        catch (JsonException)
+        {
+            return json;
+        }
+    }
+}

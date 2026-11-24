@@ -1,0 +1,721 @@
+﻿<!DOCTYPE html >
+<html lang="ru" >
+
+<head >
+<meta charset="utf-8" / >
+<meta name="viewport" content="width=device-width, initial-scale=1.0" / >
+<title > М-Пласт — проверка адаптивности</title >
+<style >
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #fff;
+    background: #081e26;
+    overflow: hidden;
+}
+
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+}
+
+.main-header {
+    height: 60px;
+    background: #ffffff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+    z-index: 10;
+}
+
+.brand-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.brand-badge {
+    background: #00a884;
+    color: #ffffff;
+    font-weight: 800;
+    font-size: 16px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    letter-spacing: -0.5px;
+}
+
+.brand-titles {
+    display: flex;
+    flex-direction: column;
+}
+
+.brand-title {
+    color: #1e293b;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.brand-sub {
+    color: #94a3b8;
+    font-size: 11px;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.btn-header-notif {
+    background: #f1f5f9;
+    color: #334155;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.notif-circle {
+    background: #ef4444;
+    color: #fff;
+    font-size: 11px;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-header-logout {
+    background: #ffffff;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+    .btn-header-logout:hover {
+        background: #f8fafc;
+    }
+
+.main-body {
+    display: flex;
+    flex: 1;
+    height: calc(100vh - 60px);
+    overflow: hidden;
+}
+
+.side-nav {
+    width: 190px;
+    background: #111a2e;
+    padding: 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.side-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #1a263d;
+    color: #94a3b8;
+    padding: 10px 14px;
+    border-radius: 10px;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.15s ease-in-out;
+}
+
+    .side-item:hover, .side-item.active {
+        background: #243452;
+        color: #ffffff;
+    }
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.dot-green {
+    background: #10b981;
+}
+
+.dot-blue {
+    background: #3b82f6;
+}
+
+.dot-yellow {
+    background: #f59e0b;
+}
+
+.dot-teal {
+    background: #14b8a6;
+}
+
+.dot-orange {
+    background: #f97316;
+}
+
+.dot-purple {
+    background: #8b5cf6;
+}
+
+.dot-pink {
+    background: #ec4899;
+}
+
+.dot-red {
+    background: #ef4444;
+}
+
+.workspace {
+    flex: 1;
+    background: radial-gradient(circle at 100% 100%, #155e63 0%, #08272c 50%, #06171d 100%);
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.page-title-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.page-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.btn-create-task {
+    background: #00a884;
+    color: #ffffff;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+    .btn-create-task:hover {
+        background: #029474;
+    }
+
+.kanban-board {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    flex: 1;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    min-height: 480px;
+}
+
+.k-column {
+    border-right: 1px dashed rgba(255, 255, 255, 0.15);
+    display: flex;
+    flex-direction: column;
+}
+
+    .k-column:last-child {
+        border-right: none;
+    }
+
+.k-header {
+    height: 40px;
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #1e293b;
+}
+
+.kh-red {
+    background: #f87171;
+}
+
+.kh-green {
+    background: #a3e635;
+}
+
+.kh-cyan {
+    background: #22d3ee;
+}
+
+.kh-blue {
+    background: #38bdf8;
+}
+
+.kh-gray {
+    background: #cbd5e1;
+}
+
+.k-plus-btn {
+    text-align: center;
+    color: rgba(255,255,255,0.7);
+    font-size: 18px;
+    padding: 8px 0;
+    cursor: pointer;
+    user-select: none;
+}
+
+    .k-plus-btn:hover {
+        color: #fff;
+    }
+
+.k-cards-area {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+}
+
+.white-task-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 14px 16px;
+    color: #1e293b;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    cursor: pointer;
+}
+
+.card-num {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #0f172a;
+}
+
+.card-pill-blue {
+    display: inline-block;
+    border: 1px solid #38bdf8;
+    color: #0284c7;
+    background: #f0f9ff;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    margin-bottom: 10px;
+}
+
+.card-circle-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.card-circle {
+    background: #00a884;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.card-circle-text {
+    font-size: 12px;
+    color: #475569;
+}
+
+.bottom-closed-panel {
+    background: #ffffff;
+    border-radius: 14px 14px 0 0;
+    padding: 12px 24px;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 700;
+    margin-top: 16px;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+}
+
+/* =====================================================
+           АДАПТАЦИЯ ПОД РАЗМЕР ОКНА
+           На ширине больше 1280px ничего не меняется
+           ===================================================== */
+
+html, body {
+    max-width: 100%;
+    -webkit-text-size-adjust: 100%;
+}
+
+img, svg, canvas {
+    max-width: 100%;
+}
+
+.kctitle,
+.card-num,
+.hroute,
+.hitem,
+.tmsg-text,
+.detail,
+.brand-title,
+.tchip {
+    overflow-wrap: anywhere;
+}
+
+/* Ноутбук 13–14" */
+@media (max-width: 1280px) {
+    .side-nav {
+        width: 168px !important;
+        padding: 12px 8px !important;
+    }
+
+    .side-item {
+        padding: 9px 10px !important;
+        font-size: 12.5px !important;
+        gap: 8px !important;
+    }
+
+    .workspace {
+        padding: 16px 18px !important;
+    }
+
+    .kanban-board {
+        grid-template-columns: repeat(5, minmax(148px, 1fr)) !important;
+    }
+
+    .k-header {
+        font-size: 11px !important;
+        padding: 0 8px !important;
+    }
+
+    .white-task-card {
+        padding: 10px 12px !important;
+    }
+}
+
+/* Меню сжимается в полоску, канбан прокручивается по горизонтали */
+@media (max-width: 1100px) {
+    .side-nav {
+        width: 58px !important;
+        padding: 12px 6px !important;
+    }
+
+    .side-item {
+        justify-content: center !important;
+        padding: 10px 0 !important;
+        font-size: 0 !important;
+        gap: 0 !important;
+    }
+
+        .side-item .dot {
+            width: 10px !important;
+            height: 10px !important;
+        }
+
+    .kanban-board {
+        display: flex !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255,255,255,.3) transparent;
+    }
+
+        .kanban-board::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .kanban-board::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .kanban-board::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,.28);
+            border-radius: 4px;
+        }
+
+    .k-column {
+        flex: 0 0 205px !important;
+        min-width: 205px !important;
+    }
+
+    .k-cards-area {
+        overflow-y: auto !important;
+    }
+}
+
+/* Планшет вертикально */
+@media (max-width: 900px) {
+    .main-header {
+        height: 54px !important;
+        padding: 0 14px !important;
+    }
+
+    .brand-sub {
+        display: none !important;
+    }
+
+    .brand-title {
+        font-size: 15px !important;
+    }
+
+    .brand-badge {
+        font-size: 14px !important;
+        padding: 4px 8px !important;
+    }
+
+    .btn-header-notif,
+    .btn-header-logout {
+        padding: 6px 12px !important;
+        font-size: 12px !important;
+    }
+
+    .main-body {
+        height: calc(100vh - 54px) !important;
+    }
+
+    .workspace {
+        padding: 14px !important;
+    }
+
+    .page-title {
+        font-size: 18px !important;
+    }
+
+    .bottom-closed-panel {
+        font-size: 12px !important;
+        padding: 9px 14px !important;
+    }
+}
+
+/* Телефон: меню уходит наверх, колонки — по одной */
+@media (max-width: 640px) {
+    .main-body {
+        flex-direction: column !important;
+    }
+
+    .side-nav {
+        width: 100% !important;
+        flex-direction: row !important;
+        overflow-x: auto !important;
+        flex-shrink: 0 !important;
+        padding: 8px !important;
+        gap: 8px !important;
+        border-bottom: 1px solid rgba(255,255,255,.08);
+        scrollbar-width: none;
+    }
+
+        .side-nav::-webkit-scrollbar {
+            height: 0;
+        }
+
+    .side-item {
+        flex: 0 0 auto !important;
+        justify-content: flex-start !important;
+        font-size: 12px !important;
+        padding: 9px 12px !important;
+        gap: 7px !important;
+    }
+
+    .main-header {
+        padding: 0 10px !important;
+    }
+
+    .brand-titles {
+        display: none !important;
+    }
+
+    .btn-header-notif {
+        padding: 6px 9px !important;
+    }
+
+    .workspace {
+        padding: 12px !important;
+    }
+
+    .page-title-row {
+        gap: 10px !important;
+        flex-wrap: wrap;
+    }
+
+    .page-title {
+        font-size: 16px !important;
+    }
+
+    .btn-create-task {
+        padding: 7px 12px !important;
+        font-size: 12px !important;
+    }
+
+    .k-column {
+        flex: 0 0 78vw !important;
+        min-width: 78vw !important;
+    }
+
+    .kanban-board {
+        min-height: 320px !important;
+    }
+}
+
+@supports (height: 100dvh) {
+    .app-container {
+        height: 100dvh !important;
+    }
+
+    .main-body {
+        height: calc(100dvh - 60px) !important;
+    }
+}
+
+@supports (height: 100dvh) {
+    @media (max-width: 900px) {
+        .main-body {
+            height: calc(100dvh - 54px) !important;
+        }
+    }
+}
+
+</style >
+</head >
+
+<body >
+<div class="app-container" >
+
+<header class="main-header" >
+<div class="brand-section" >
+<div class="brand-badge" > МП</div >
+<div class="brand-titles" >
+<span class="brand-title" > М-Пласт</span >
+<span class="brand-sub" > Логистика · Панель управления</span >
+</div >
+</div >
+
+<div class="header-actions" >
+<button class="btn-header-notif" >
+Уведомления <span class="notif-circle" > 2</span >
+</button >
+<button class="btn-header-logout" > Выйти</button >
+</div >
+</header >
+
+<div class="main-body" >
+
+<aside class="side-nav" >
+<a href="#" class="side-item active" > <span class="dot dot-green" > </span > Заявки</a >
+<a href="#" class="side-item" > <span class="dot dot-blue" > </span > Наши клиенты</a >
+<a href="#" class="side-item" > <span class="dot dot-yellow" > </span > Калькулятор</a >
+<a href="#" class="side-item" > <span class="dot dot-teal" > </span > ЭтрН</a >
+<a href="#" class="side-item" > <span class="dot dot-orange" > </span > АТИ</a >
+<a href="#" class="side-item" > <span class="dot dot-purple" > </span > Чат</a >
+<a href="#" class="side-item" > <span class="dot dot-pink" > </span > Сотрудники</a >
+<a href="#" class="side-item" > <span class="dot dot-red" > </span > Уведомления</a >
+</aside >
+
+<main class="workspace" >
+
+<div class="page-title-row" >
+<h2 class="page-title" > Заявки</h2 >
+<button class="btn-create-task" > + Создать заявку</button >
+</div >
+
+<div class="kanban-board" >
+
+<div class="k-column" >
+<div class="k-header kh-red" > <span > Просрочены</span > <span > 1</span > </div >
+<div class="k-plus-btn" > + </div >
+<div class="k-cards-area" >
+<div class="white-task-card" >
+<div class="card-num" > Москва — Казань</div >
+<div class="card-pill-blue" > ООО «Ромашка»</div >
+<div class="card-circle-row" >
+<span class="card-circle" > !</span >
+<span class="card-circle-text" > Срочно</span >
+</div >
+</div >
+</div >
+</div >
+
+<div class="k-column" >
+<div class="k-header kh-green" > <span > На сегодня</span > <span > 2</span > </div >
+<div class="k-plus-btn" > + </div >
+<div class="k-cards-area" >
+<div class="white-task-card" >
+<div class="card-num" > СПб — Новгород</div >
+<div class="card-pill-blue" > ИП Смирнов</div >
+<div class="card-circle-row" >
+<span class="card-circle" > 1</span >
+<span class="card-circle-text" > В работе</span >
+</div >
+</div >
+<div class="white-task-card" >
+<div class="card-num" > Тверь — Москва</div >
+<div class="card-pill-blue" > АО «Вектор»</div >
+</div >
+</div >
+</div >
+
+<div class="k-column" >
+<div class="k-header kh-cyan" > <span > На этой неделе</span > <span > 1</span > </div >
+<div class="k-plus-btn" > + </div >
+<div class="k-cards-area" >
+<div class="white-task-card" >
+<div class="card-num" > Ярославль — Вологда</div >
+<div class="card-pill-blue" > ООО «Север»</div >
+</div >
+</div >
+</div >
+
+<div class="k-column" >
+<div class="k-header kh-blue" > <span > На следующей неделе</span > <span > 0</span > </div >
+<div class="k-plus-btn" > + </div >
+<div class="k-cards-area" > </div >
+</div >
+
+<div class="k-column" >
+<div class="k-header kh-gray" > <span > Без срока</span > <span > 1</span > </div >
+<div class="k-plus-btn" > + </div >
+<div class="k-cards-area" >
+<div class="white-task-card" >
+<div class="card-num" > Склад — Склад</div >
+<div class="card-pill-blue" > Без клиента</div >
+</div >
+</div >
+</div >
+
+</div >
+
+<div class="bottom-closed-panel" >
+Завершённые — 0
+</div >
+
+</main >
+
+</div >
+</div >
+</body >
+
+</html >

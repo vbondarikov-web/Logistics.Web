@@ -1,0 +1,789 @@
+﻿@page "/"
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@using System.Globalization
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using Logistics.Web.Models
+
+<style>
+    .task-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+
+    .view-switch {
+        display: inline-flex;
+        background: rgba(255,255,255,.10);
+        border: 1px solid rgba(255,255,255,.18);
+        border-radius: 10px;
+        padding: 3px;
+        gap: 3px;
+    }
+
+    .vbtn {
+        border: none;
+        background: transparent;
+        color: #d1fae5;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 6px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-family: inherit;
+    }
+
+        .vbtn:hover {
+            color: #ffffff;
+            background: rgba(255,255,255,.08);
+        }
+
+        .vbtn.on {
+            background: #00a884;
+            color: #ffffff;
+        }
+
+    .white-task-card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 12px 14px;
+        color: #1e293b;
+        box-shadow: 0 4px 12px rgba(0,0,0,.15);
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        transition: box-shadow .15s ease, transform .15s ease;
+    }
+
+        .white-task-card:hover {
+            box-shadow: 0 7px 20px rgba(0,0,0,.22);
+            transform: translateY(-1px);
+        }
+
+    .wt-title-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    .wt-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: #0f172a;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+        flex: 1;
+    }
+
+    .wt-change {
+        flex-shrink: 0;
+        background: #22c55e;
+        color: #ffffff;
+        font-size: 10px;
+        font-weight: 800;
+        border-radius: 50%;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 4px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .wt-client {
+        align-self: flex-start;
+        max-width: 100%;
+        font-size: 11px;
+        color: #0284c7;
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
+        border-radius: 10px;
+        padding: 1px 8px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .wt-fire {
+        align-self: flex-start;
+        font-size: 17px;
+        line-height: 1;
+        animation: firePulse 1.4s ease-in-out infinite;
+        filter: drop-shadow(0 0 5px rgba(249,115,22,.55));
+    }
+
+    @@keyframes firePulse {
+        0%, 100% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.15);
+        }
+    }
+
+    .date-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border: 1px solid #38bdf8;
+        background: #f0f9ff;
+        color: #0284c7;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+    }
+
+        .date-pill:hover {
+            background: #e0f2fe;
+            border-color: #0284c7;
+        }
+
+        .date-pill.late {
+            border-color: #fca5a5;
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
+        .date-pill.empty {
+            border-style: dashed;
+            border-color: #cbd5e1;
+            background: #f8fafc;
+            color: #64748b;
+        }
+
+    .wt-person {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 11.5px;
+        color: #334155;
+        min-width: 0;
+    }
+
+        .wt-person.none {
+            color: #94a3b8;
+            font-style: italic;
+        }
+
+    .wt-ava {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #0f766e;
+        color: #ffffff;
+        font-size: 10px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+        .wt-ava.none {
+            background: #e2e8f0;
+            color: #94a3b8;
+        }
+
+    .wt-person span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .list-wrap {
+        background: #ffffff;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 16px rgba(0,0,0,.12);
+    }
+
+    .tasks-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12.5px;
+        color: #0f172a;
+    }
+
+        .tasks-table thead th {
+            background: #f8fafc;
+            text-align: left;
+            font-size: 10px;
+            letter-spacing: .4px;
+            text-transform: uppercase;
+            color: #64748b;
+            padding: 10px 12px;
+            border-bottom: 1px solid #e2e8f0;
+            white-space: nowrap;
+        }
+
+        .tasks-table tbody td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #eef2f7;
+            vertical-align: middle;
+        }
+
+        .tasks-table tbody tr {
+            cursor: pointer;
+        }
+
+            .tasks-table tbody tr:hover {
+                background: #f8fafc;
+            }
+
+            .tasks-table tbody tr:last-child td {
+                border-bottom: none;
+            }
+
+    .tv-title {
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        overflow-wrap: anywhere;
+    }
+
+    .tv-fire {
+        font-size: 14px;
+    }
+
+    .tv-change {
+        background: #22c55e;
+        color: #ffffff;
+        font-size: 9px;
+        font-weight: 800;
+        border-radius: 50%;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 3px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .tv-status {
+        display: inline-block;
+        font-size: 10.5px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 8px;
+        white-space: nowrap;
+    }
+
+    .st-new {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+    }
+
+    .st-work {
+        background: #ecfdf5;
+        color: #047857;
+        border: 1px solid #a7f3d0;
+    }
+
+    .st-done {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+    }
+
+    .st-cancel {
+        background: #fef2f2;
+        color: #b91c1c;
+        border: 1px solid #fecaca;
+    }
+
+    .tv-person {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+    }
+
+    .tv-ava {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #0f766e;
+        color: #ffffff;
+        font-size: 9px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+        .tv-ava.none {
+            background: #e2e8f0;
+            color: #94a3b8;
+        }
+
+    .tv-none {
+        color: #94a3b8;
+        font-style: italic;
+        font-size: 11.5px;
+    }
+
+    .tv-cost {
+        font-weight: 700;
+        color: #0f766e;
+        white-space: nowrap;
+    }
+
+        .tv-cost.none {
+            color: #cbd5e1;
+            font-weight: 400;
+        }
+
+    .list-empty {
+        padding: 26px;
+        text-align: center;
+        color: #94a3b8;
+        font-size: 13px;
+    }
+
+    .dlg-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(2,6,23,.55);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+    }
+
+    .dlg {
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 18px 20px;
+        width: 320px;
+        max-width: 92vw;
+        box-shadow: 0 20px 50px rgba(0,0,0,.35);
+        color: #0f172a;
+    }
+
+    .dlg-title {
+        font-size: 15px;
+        font-weight: 800;
+    }
+
+    .dlg-sub {
+        font-size: 12px;
+        color: #64748b;
+        margin: 2px 0 12px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .dlg-input {
+        width: 100%;
+        height: 36px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 0 10px;
+        font-size: 13px;
+        background: #f8fafc;
+        color: #0f172a;
+        outline: none;
+        box-sizing: border-box;
+    }
+
+        .dlg-input:focus {
+            border-color: #00a884;
+            background: #ffffff;
+        }
+
+    .dlg-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 14px;
+    }
+
+    .dlg-btn {
+        height: 34px;
+        padding: 0 12px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        color: #334155;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+        .dlg-btn:hover {
+            background: #f1f5f9;
+        }
+
+        .dlg-btn.primary {
+            background: #00a884;
+            border-color: #00a884;
+            color: #ffffff;
+        }
+
+            .dlg-btn.primary:hover {
+                background: #029474;
+            }
+
+        .dlg-btn.danger {
+            color: #b91c1c;
+            border-color: #fecaca;
+            margin-right: auto;
+        }
+
+            .dlg-btn.danger:hover {
+                background: #fef2f2;
+            }
+
+    @@media (max-width: 1000px) {
+        .col-cost {
+            display: none;
+        }
+    }
+
+    @@media (max-width: 820px) {
+        .col-client {
+            display: none;
+        }
+    }
+
+    @@media (max-width: 640px) {
+        .col-person {
+            display: none;
+        }
+    }
+</style>
+
+<div class="page-title-row">
+    <h2 class="page-title">Заявки</h2>
+    <button class="btn-create-task" @onclick="CreateTask">+ Создать заявку</button>
+</div>
+
+<div class="task-toolbar">
+    <div class="view-switch">
+        <button type="button" class="vbtn @(viewMode == "kanban" ? "on" : "")" @onclick="ShowKanban">Канбан</button>
+        <button type="button" class="vbtn @(viewMode == "list" ? "on" : "")" @onclick="ShowList">Список</button>
+    </div>
+</div>
+
+@if (viewMode == "kanban")
+{
+    <div class="kanban-board">
+        <div class="k-column">
+            <div class="k-header kh-red"><span>Просрочены</span><span>@Overdue.Count</span></div>
+            <div class="k-plus-btn" @onclick="CreateTask">+</div>
+            <div class="k-cards-area">@foreach (var t in Overdue) {
+                @RenderCard(t)
+            }
+        </div>
+    </div>
+    <div class="k-column">
+        <div class="k-header kh-green"><span>На сегодня</span><span>@Today.Count</span></div>
+        <div class="k-plus-btn" @onclick="CreateTask">+</div>
+        <div class="k-cards-area">@foreach (var t in Today) {
+            @RenderCard(t)
+        }
+    </div>
+</div>
+<div class="k-column">
+    <div class="k-header kh-cyan"><span>На этой неделе</span><span>@ThisWeek.Count</span></div>
+    <div class="k-plus-btn" @onclick="CreateTask">+</div>
+    <div class="k-cards-area">@foreach (var t in ThisWeek) {
+        @RenderCard(t)
+    }
+</div>
+</div>
+<div class="k-column">
+    <div class="k-header kh-blue"><span>На следующей неделе</span><span>@NextWeek.Count</span></div>
+    <div class="k-plus-btn" @onclick="CreateTask">+</div>
+    <div class="k-cards-area">@foreach (var t in NextWeek) {
+        @RenderCard(t)
+    }
+</div>
+</div>
+<div class="k-column">
+    <div class="k-header kh-gray"><span>Без срока</span><span>@NoDeadline.Count</span></div>
+    <div class="k-plus-btn" @onclick="CreateTask">+</div>
+    <div class="k-cards-area">@foreach (var t in NoDeadline) {
+        @RenderCard(t)
+    }
+</div>
+</div>
+</div>
+}
+else
+{
+    <div class="list-wrap">
+        @if (ActiveTasks.Count == 0)
+        {
+            <div class="list-empty">Заявок нет</div>
+        }
+        else
+        {
+            <table class="tasks-table">
+                <thead>
+                    <tr>
+                        <th>Заявка</th>
+                        <th class="col-client">Клиент</th>
+                        <th>Срок</th>
+                        <th>Статус</th>
+                        <th class="col-person">В работе</th>
+                        <th class="col-cost">Себестоимость</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in ActiveTasks)
+                    {
+                        <tr @onclick="() => OpenTask(t.Id)">
+                            <td>
+                                <div class="tv-title">
+                                    @if (t.IsHot)
+                                    {
+                                        <span class="tv-fire" title="Горящая заявка">🔥</span>
+                                    }
+                                    <span>@t.Title</span>
+                                    @if (t.ChangeCount > 0)
+                                    {
+                                        <span class="tv-change" title="Изменений: @t.ChangeCount">@t.ChangeCount</span>
+                                    }
+                                </div>
+                            </td>
+                            <td class="col-client">
+                                @if (!string.IsNullOrWhiteSpace(t.ClientName))
+                                {
+                                    @t.ClientName
+                                }
+                                else
+                                {
+
+                                    <span class="tv-none">—</span>
+                                }
+                            </td>
+                            <td>
+                                <button type="button" class="@DateClass(t)"
+                                        @onclick:stopPropagation="true" @onclick="() => OpenDateEdit(t)">
+                                    📅 @DeadlineText(t)
+                                </button>
+                            </td>
+                            <td><span class="tv-status @StatusCss(t.Status)">@t.Status</span></td>
+                            <td class="col-person">
+                                <div class="tv-person">
+                                    <span class="tv-ava @(string.IsNullOrWhiteSpace(t.TakenBy) ? "none" : "")">@Initials(t.TakenBy)</span>
+                                    @if (string.IsNullOrWhiteSpace(t.TakenBy))
+                                    {
+                                        <span class="tv-none">не взято</span>
+                                    }
+                                    else
+                                    {
+
+                                        <span>@t.TakenBy</span>
+                                    }
+                                </div>
+                            </td>
+                            <td class="col-cost">
+                                @if (t.Cost.HasValue && t.Cost.Value > 0)
+                                {
+                                    <span class="tv-cost">@t.Cost.Value.ToString("N0") ₽</span>
+                                }
+                                else
+                                {
+
+                                    <span class="tv-cost none">—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+}
+
+<div class="bottom-closed-panel">Завершённые — @CompletedCount</div>
+
+@if (dateEditTask != null)
+{
+    <div class="dlg-backdrop" @onclick="CancelDateEdit">
+        <div class="dlg" @onclick:stopPropagation="true">
+            <div class="dlg-title">Срок задачи</div>
+            <div class="dlg-sub">@dateEditTask.Title</div>
+            <input type="datetime-local" class="dlg-input" @bind="dateEditValue" />
+            <div class="dlg-actions">
+                <button class="dlg-btn danger" @onclick="ClearDeadline">Убрать срок</button>
+                <button class="dlg-btn" @onclick="CancelDateEdit">Отмена</button>
+                <button class="dlg-btn primary" @onclick="SaveDeadline">Сохранить</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    string viewMode = "kanban";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            var saved = await JS.InvokeAsync<string?>("localStorage.getItem", "tasksViewMode");
+            if ((saved == "list" || saved == "kanban") && saved != viewMode)
+            {
+                viewMode = saved!;
+                StateHasChanged();
+            }
+        }
+        catch { }
+    }
+
+    void ShowKanban() => SwitchMode("kanban");
+    void ShowList() => SwitchMode("list");
+
+    void SwitchMode(string m)
+    {
+        viewMode = m;
+        _ = JS.InvokeVoidAsync("localStorage.setItem", "tasksViewMode", m);
+    }
+
+    List<WorkTask> Overdue => TaskStore.Tasks
+        .Where(t => t.Deadline.HasValue && t.Deadline.Value.Date < DateTime.Today && t.Status != "Выполнена")
+        .OrderBy(t => t.Deadline).ToList();
+
+    List<WorkTask> Today => TaskStore.Tasks
+        .Where(t => t.Deadline.HasValue && t.Deadline.Value.Date == DateTime.Today && t.Status != "Выполнена")
+        .OrderBy(t => t.Deadline).ToList();
+
+    List<WorkTask> ThisWeek => TaskStore.Tasks
+        .Where(t => t.Deadline.HasValue && t.Deadline.Value.Date > DateTime.Today
+            && t.Deadline.Value.Date <= DateTime.Today.AddDays(7) && t.Status != "Выполнена")
+        .OrderBy(t => t.Deadline).ToList();
+
+    List<WorkTask> NextWeek => TaskStore.Tasks
+        .Where(t => t.Deadline.HasValue && t.Deadline.Value.Date > DateTime.Today.AddDays(7)
+            && t.Deadline.Value.Date <= DateTime.Today.AddDays(14) && t.Status != "Выполнена")
+        .OrderBy(t => t.Deadline).ToList();
+
+    List<WorkTask> NoDeadline => TaskStore.Tasks
+        .Where(t => !t.Deadline.HasValue && t.Status != "Выполнена").ToList();
+
+    int CompletedCount => TaskStore.Tasks.Count(t => t.Status == "Выполнена");
+
+    List<WorkTask> ActiveTasks => TaskStore.Tasks
+        .Where(t => t.Status != "Выполнена")
+        .OrderBy(t => t.Deadline ?? DateTime.MaxValue)
+        .ThenBy(t => t.Title, StringComparer.CurrentCultureIgnoreCase)
+        .ToList();
+
+    void CreateTask() => Nav.NavigateTo("/task/new");
+    void OpenTask(Guid id) => Nav.NavigateTo($"/task/{id}");
+
+    string DeadlineText(WorkTask t)
+    {
+        if (!t.Deadline.HasValue) return "Указать срок";
+        var d = t.Deadline.Value;
+        var ru = new CultureInfo("ru-RU");
+        return d.Year == DateTime.Today.Year
+            ? d.ToString("d MMMM, HH:mm", ru)
+            : d.ToString("d MMMM yyyy, HH:mm", ru);
+    }
+
+    string DateClass(WorkTask t)
+    {
+        if (!t.Deadline.HasValue) return "date-pill empty";
+        return t.Deadline.Value.Date < DateTime.Today ? "date-pill late" : "date-pill";
+    }
+
+    string StatusCss(string status) => status switch
+    {
+        "В работе" => "st-work",
+        "Выполнена" => "st-done",
+        "Не актуально" => "st-cancel",
+        _ => "st-new"
+    };
+
+    string Initials(string fio)
+    {
+        if (string.IsNullOrWhiteSpace(fio)) return "—";
+        var parts = fio.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0) return "—";
+        if (parts.Length == 1) return parts[0][..1].ToUpper();
+        return (parts[0][0].ToString() + parts[1][0].ToString()).ToUpper();
+    }
+
+    WorkTask? dateEditTask;
+    DateTime? dateEditValue;
+
+    void OpenDateEdit(WorkTask task)
+    {
+        dateEditTask = task;
+        dateEditValue = task.Deadline ?? DateTime.Today.AddHours(18);
+    }
+
+    void CancelDateEdit() => dateEditTask = null;
+
+    void SaveDeadline()
+    {
+        if (dateEditTask == null) return;
+        dateEditTask.Deadline = dateEditValue;
+        TaskStore.Notify(dateEditTask, "Изменён срок",
+            dateEditTask.Title + " — " + DeadlineText(dateEditTask));
+        SqliteStore.SaveAll();
+        dateEditTask = null;
+    }
+
+    void ClearDeadline()
+    {
+        if (dateEditTask == null) return;
+        dateEditTask.Deadline = null;
+        TaskStore.Notify(dateEditTask, "Убран срок", dateEditTask.Title);
+        SqliteStore.SaveAll();
+        dateEditTask = null;
+    }
+
+    RenderFragment RenderCard(WorkTask t) => __builder =>
+    {
+        <div class="white-task-card" @onclick="() => OpenTask(t.Id)">
+            <div class="wt-title-row">
+                <div class="wt-title">@t.Title</div>
+                @if (t.ChangeCount > 0)
+                {
+                    <span class="wt-change" title="Изменений: @t.ChangeCount">@t.ChangeCount</span>
+                }
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(t.ClientName))
+            {
+                <div class="wt-client">@t.ClientName</div>
+            }
+
+            @if (t.IsHot)
+            {
+                <div class="wt-fire" title="Горящая заявка">🔥</div>
+            }
+
+            <button type="button" class="@DateClass(t)"
+                    @onclick:stopPropagation="true" @onclick="() => OpenDateEdit(t)">
+                📅 @DeadlineText(t)
+            </button>
+
+            <div class="wt-person @(string.IsNullOrWhiteSpace(t.TakenBy) ? "none" : "")">
+                <span class="wt-ava @(string.IsNullOrWhiteSpace(t.TakenBy) ? "none" : "")">@Initials(t.TakenBy)</span>
+                <span>
+                    @(string.IsNullOrWhiteSpace(t.TakenBy)
+                        ? "Не взято в работу"
+                        : "Взял в работу: " + t.TakenBy)
+                </span>
+            </div>
+        </div>
+    };
+}

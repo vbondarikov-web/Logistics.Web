@@ -1,0 +1,1210 @@
+﻿@page "/chat"
+@using Logistics.Web.Models
+@using Microsoft.AspNetCore.Components.Web
+@implements IDisposable
+
+<style>
+    .chat-page {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 120px);
+    }
+
+    .chat-top {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+
+    .chat-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: #ffffff;
+        margin: 0;
+    }
+
+    .c-search {
+        margin-left: auto;
+        height: 34px;
+        width: 280px;
+        max-width: 100%;
+        border-radius: 9px;
+        border: 1px solid rgba(255,255,255,.22);
+        background: rgba(255,255,255,.10);
+        color: #ffffff;
+        padding: 0 12px;
+        font-size: 12.5px;
+        outline: none;
+    }
+
+        .c-search::placeholder {
+            color: #94d8c8;
+        }
+
+        .c-search:focus {
+            border-color: #00a884;
+            background: rgba(255,255,255,.16);
+        }
+
+    .c-btn {
+        height: 34px;
+        padding: 0 14px;
+        border-radius: 9px;
+        border: 1px solid rgba(255,255,255,.25);
+        background: rgba(255,255,255,.10);
+        color: #d1fae5;
+        font-size: 12.5px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+    }
+
+        .c-btn:hover {
+            background: rgba(255,255,255,.18);
+            color: #ffffff;
+        }
+
+        .c-btn.primary {
+            background: #00a884;
+            border-color: #00a884;
+            color: #ffffff;
+        }
+
+            .c-btn.primary:hover {
+                background: #029474;
+            }
+
+    .chat-body {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr);
+        gap: 12px;
+        min-height: 0;
+    }
+
+    .chat-side {
+        background: #ffffff;
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 6px 20px rgba(0,0,0,.18);
+        min-height: 0;
+    }
+
+    .c-tabs {
+        display: flex;
+        gap: 4px;
+        padding: 8px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .c-tab {
+        flex: 1;
+        border: none;
+        background: #f1f5f9;
+        color: #475569;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 7px 4px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-family: inherit;
+    }
+
+        .c-tab:hover {
+            background: #e2e8f0;
+        }
+
+        .c-tab.on {
+            background: #00a884;
+            color: #ffffff;
+        }
+
+    .c-rows {
+        flex: 1;
+        overflow-y: auto;
+        padding: 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .c-row {
+        display: flex;
+        gap: 9px;
+        align-items: center;
+        padding: 8px;
+        border-radius: 9px;
+        cursor: pointer;
+    }
+
+        .c-row:hover {
+            background: #f1f5f9;
+        }
+
+        .c-row.on {
+            background: #ecfdf5;
+            box-shadow: inset 0 0 0 1px #a7f3d0;
+        }
+
+    .c-row-ava {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: #0f766e;
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .c-row-body {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .c-row-title {
+        font-size: 12.5px;
+        font-weight: 700;
+        color: #0f172a;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .c-row-sub {
+        font-size: 10.5px;
+        color: #94a3b8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .c-unread {
+        flex-shrink: 0;
+        background: #22c55e;
+        color: #ffffff;
+        font-size: 10px;
+        font-weight: 800;
+        border-radius: 50%;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 4px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .chat-main {
+        background: #ffffff;
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 6px 20px rgba(0,0,0,.18);
+        min-height: 0;
+    }
+
+    .c-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 14px;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
+    }
+
+    .c-head-text {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .c-head-title {
+        font-size: 14px;
+        font-weight: 800;
+        color: #0f172a;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .c-head-sub {
+        font-size: 11px;
+        color: #94a3b8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .c-pencil {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+        .c-pencil:hover {
+            background: #ecfdf5;
+            border-color: #a7f3d0;
+        }
+
+    .c-msgs {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .c-msg {
+        max-width: 78%;
+        background: #f1f5f9;
+        border-radius: 10px;
+        padding: 7px 10px;
+        align-self: flex-start;
+        cursor: context-menu;
+    }
+
+        .c-msg:hover {
+            box-shadow: inset 0 0 0 1px #cbd5e1;
+        }
+
+        .c-msg.own {
+            align-self: flex-end;
+            background: #ecfdf5;
+            box-shadow: inset 0 0 0 1px #a7f3d0;
+        }
+
+    .c-msg-top {
+        display: flex;
+        gap: 6px;
+        align-items: baseline;
+        flex-wrap: wrap;
+    }
+
+    .c-msg-author {
+        font-size: 10px;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .c-msg-time {
+        font-size: 9px;
+        color: #94a3b8;
+    }
+
+    .c-msg-edited {
+        font-size: 9px;
+        color: #94a3b8;
+        font-style: italic;
+    }
+
+    .c-msg-text {
+        font-size: 12.5px;
+        color: #1e293b;
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin-top: 2px;
+    }
+
+    .c-reply-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+        font-size: 11px;
+        color: #0f766e;
+    }
+
+    .c-reply-text {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-style: italic;
+    }
+
+    .c-reply-close {
+        border: none;
+        background: transparent;
+        color: #94a3b8;
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+    }
+
+        .c-reply-close:hover {
+            color: #ef4444;
+        }
+
+    .c-input-row {
+        display: flex;
+        gap: 8px;
+        padding: 10px 12px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .c-input {
+        flex: 1;
+        height: 34px;
+        border: 1px solid #cbd5e1;
+        border-radius: 9px;
+        background: #f8fafc;
+        padding: 0 12px;
+        font-size: 12.5px;
+        outline: none;
+    }
+
+        .c-input:focus {
+            border-color: #00a884;
+            background: #ffffff;
+        }
+
+    .c-placeholder, .c-empty {
+        padding: 18px;
+        text-align: center;
+        color: #94a3b8;
+        font-size: 12.5px;
+    }
+
+    .chat-main .c-placeholder {
+        margin: auto;
+    }
+
+    .c-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(2,6,23,.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 4000;
+        padding: 20px;
+    }
+
+    .c-modal {
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 18px 20px;
+        width: 380px;
+        max-width: 100%;
+        max-height: 86vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 24px 60px rgba(0,0,0,.45);
+    }
+
+    .c-modal-title {
+        font-size: 15px;
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 10px;
+    }
+
+    .c-modal-lbl {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .4px;
+        color: #64748b;
+        margin: 8px 0 4px;
+    }
+
+    .c-modal-inp {
+        width: 100%;
+        height: 34px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #f8fafc;
+        padding: 0 10px;
+        font-size: 13px;
+        outline: none;
+        box-sizing: border-box;
+    }
+
+        .c-modal-inp:focus {
+            border-color: #00a884;
+            background: #ffffff;
+        }
+
+    .c-modal-ta {
+        width: 100%;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #f8fafc;
+        padding: 8px 10px;
+        font-size: 13px;
+        font-family: inherit;
+        resize: vertical;
+        box-sizing: border-box;
+        min-height: 76px;
+        outline: none;
+    }
+
+        .c-modal-ta:focus {
+            border-color: #00a884;
+            background: #ffffff;
+        }
+
+    .c-members {
+        flex: 1;
+        overflow-y: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 6px;
+        max-height: 260px;
+        background: #f8fafc;
+    }
+
+    .c-member {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12.5px;
+        color: #1e293b;
+    }
+
+        .c-member:hover {
+            background: #ecfdf5;
+        }
+
+    .c-member-pos {
+        margin-left: auto;
+        font-size: 10px;
+        color: #94a3b8;
+    }
+
+    .c-modal-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 14px;
+    }
+
+        .c-modal-actions .c-btn {
+            border-color: #cbd5e1;
+            background: #ffffff;
+            color: #334155;
+        }
+
+            .c-modal-actions .c-btn:hover {
+                background: #f1f5f9;
+            }
+
+            .c-modal-actions .c-btn.primary {
+                background: #00a884;
+                border-color: #00a884;
+                color: #ffffff;
+            }
+
+    .ctx-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 4500;
+    }
+
+    .ctx-menu {
+        position: fixed;
+        z-index: 4501;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        box-shadow: 0 12px 36px rgba(15,23,42,.28);
+        padding: 5px;
+        min-width: 170px;
+    }
+
+    .ctx-item {
+        display: block;
+        width: 100%;
+        text-align: left;
+        border: none;
+        background: transparent;
+        padding: 8px 12px;
+        font-size: 12.5px;
+        color: #1e293b;
+        border-radius: 7px;
+        cursor: pointer;
+        font-family: inherit;
+    }
+
+        .ctx-item:hover {
+            background: #ecfdf5;
+            color: #047857;
+        }
+
+    @@media (max-width: 900px) {
+        .chat-body {
+            grid-template-columns: 1fr;
+        }
+
+        .chat-side {
+            max-height: 260px;
+        }
+    }
+</style>
+
+@if (AuthStore.Current == null)
+{
+    <div class="chat-page">
+        <div class="c-placeholder">Войдите в систему, чтобы пользоваться чатом</div>
+    </div>
+}
+
+@if (AuthStore.Current != null)
+{
+    <div class="chat-page">
+
+        <div class="chat-top">
+            <h2 class="chat-title">Чат</h2>
+            <input class="c-search" placeholder="Поиск по группам и сотрудникам..." @bind="search" @bind:event="oninput" />
+            <button type="button" class="c-btn primary" @onclick="OpenCreateGroup">+ Создать группу</button>
+        </div>
+
+        <div class="chat-body">
+
+            <div class="chat-side">
+                <div class="c-tabs">
+                    <button type="button" class="@GroupTabClass" @onclick="OpenGroupsTab">Группы</button>
+                    <button type="button" class="@ChatTabClass" @onclick="OpenChatsTab">Чаты</button>
+                </div>
+
+                <div class="c-rows">
+                    @if (tab == "groups")
+                    {
+                        @if (VisibleGroups.Count == 0)
+                        {
+                            <div class="c-empty">Групп нет</div>
+                        }
+                        @foreach (var g in VisibleGroups)
+                        {
+                            var unreadG = ChatStore.UnreadFor(g, MyFio);
+                            <div class="@RowClass(selected == g)" @onclick="() => SelectDialog(g)">
+                                <div class="c-row-ava">@GroupInitials(g)</div>
+                                <div class="c-row-body">
+                                    <div class="c-row-title">@g.Name</div>
+                                    <div class="c-row-sub">Участников: @g.Members.Count@GroupPreview(g)</div>
+                                </div>
+                                @if (unreadG > 0)
+                                {
+                                    <span class="c-unread">@unreadG</span>
+                                }
+                            </div>
+                        }
+                    }
+
+                    @if (tab == "chats")
+                    {
+                        @if (ChatEmployees.Count == 0)
+                        {
+                            <div class="c-empty">Сотрудников нет</div>
+                        }
+                        @foreach (var e in ChatEmployees)
+                        {
+                            var dPriv = FindPrivate(e);
+                            var unreadP = dPriv == null ? 0 : ChatStore.UnreadFor(dPriv, MyFio);
+                            <div class="@RowClass(IsSelectedPrivate(e))" @onclick="() => OpenPrivate(e)">
+                                <div class="c-row-ava">@e.Initials</div>
+                                <div class="c-row-body">
+                                    <div class="c-row-title">@e.FullName</div>
+                                    <div class="c-row-sub">@PrivatePreview(e)</div>
+                                </div>
+                                @if (unreadP > 0)
+                                {
+                                    <span class="c-unread">@unreadP</span>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            <div class="chat-main">
+                @if (selected == null)
+                {
+                    <div class="c-placeholder">Выберите чат или группу</div>
+                }
+
+                @if (selected != null)
+                {
+                    <div class="c-head">
+                        <div class="c-row-ava">@HeadAvatar</div>
+                        <div class="c-head-text">
+                            <div class="c-head-title">@HeadTitle</div>
+                            <div class="c-head-sub">@HeadSub</div>
+                        </div>
+                        @if (selected.IsGroup)
+                        {
+                            <button type="button" class="c-pencil" title="Редактировать группу" @onclick="OpenEditGroup">✏️</button>
+                        }
+                    </div>
+
+                    <div class="c-msgs">
+                        @if (selected.Messages.Count == 0)
+                        {
+                            <div class="c-empty">Сообщений нет — напишите первым</div>
+                        }
+                        @foreach (var m in selected.Messages.OrderBy(x => x.Sent))
+                        {
+                            <div class="@MsgClass(m)"
+                                 @oncontextmenu="e => OpenCtx(e, m)"
+                                 @oncontextmenu:preventDefault="true">
+                                <div class="c-msg-top">
+                                    <span class="c-msg-author">@AuthorLabel(m)</span>
+                                    <span class="c-msg-time">@m.Time</span>
+                                    @if (m.IsEdited)
+                                    {
+                                        <span class="c-msg-edited">(изменено)</span>
+                                    }
+                                </div>
+                                <div class="c-msg-text">@m.Text</div>
+                            </div>
+                        }
+                    </div>
+
+                    @if (replyTo != null)
+                    {
+                        <div class="c-reply-bar">
+                            <span>↪ Ответ:</span>
+                            <span class="c-reply-text">@replyTo.Author — @Cut(replyTo.Text)</span>
+                            <button type="button" class="c-reply-close" title="Отменить ответ" @onclick="CancelReply">×</button>
+                        </div>
+                    }
+
+                    <div class="c-input-row">
+                        <input class="c-input" placeholder="Сообщение... (Enter — отправить)" @bind="msg" @bind:event="oninput" @onkeydown="OnKeyDown" />
+                        <button type="button" class="c-btn primary" @onclick="SendMessage">Отправить</button>
+                    </div>
+                }
+            </div>
+
+        </div>
+    </div>
+
+    @* ===== Контекстное меню по ПКМ ===== *@
+    @if (ctxMessage != null)
+    {
+        <div class="ctx-backdrop" @onclick="CloseCtx" @oncontextmenu="CloseCtx" @oncontextmenu:preventDefault="true"></div>
+
+        <div class="ctx-menu" style="left:@(ctxX)px; top:@(ctxY)px;" @onclick="Stop" @onclick:stopPropagation="true">
+            <button type="button" class="ctx-item" @onclick="CtxReply">Ответить</button>
+            @if (IsOwn(ctxMessage))
+            {
+                <button type="button" class="ctx-item" @onclick="CtxEdit">Редактировать</button>
+            }
+            <button type="button" class="ctx-item" @onclick="CtxForward">Переслать</button>
+        </div>
+    }
+
+    @* ===== Модалка пересылки ===== *@
+    @if (forwardModal)
+    {
+        <div class="c-backdrop" @onclick="CloseForward">
+            <div class="c-modal" @onclick="Stop" @onclick:stopPropagation="true">
+                <div class="c-modal-title">Переслать сообщение</div>
+                <div class="c-modal-lbl">Выберите сотрудника</div>
+                <div class="c-members">
+                    @foreach (var e in AllOtherEmployees)
+                    {
+                        <div class="c-member" @onclick="() => DoForward(e)">
+                            <div class="c-row-ava" style="width:28px;height:28px;font-size:11px;">@e.Initials</div>
+                            <span>@e.FullName</span>
+                            <span class="c-member-pos">@e.Position</span>
+                        </div>
+                    }
+                </div>
+                <div class="c-modal-actions">
+                    <button type="button" class="c-btn" @onclick="CloseForward">Отмена</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* ===== Модалка редактирования сообщения ===== *@
+    @if (editModal)
+    {
+        <div class="c-backdrop" @onclick="CloseEdit">
+            <div class="c-modal" @onclick="Stop" @onclick:stopPropagation="true">
+                <div class="c-modal-title">Редактировать сообщение</div>
+                <textarea class="c-modal-ta" @bind="editText" @bind:event="oninput"></textarea>
+                <div class="c-modal-actions">
+                    <button type="button" class="c-btn" @onclick="CloseEdit">Отмена</button>
+                    <button type="button" class="c-btn primary" @onclick="SaveEdit">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* ===== Модалка создания / редактирования группы ===== *@
+    @if (groupModal)
+    {
+        <div class="c-backdrop" @onclick="CloseGroupModal">
+            <div class="c-modal" @onclick="Stop" @onclick:stopPropagation="true">
+                <div class="c-modal-title">@GroupModalTitle</div>
+                <div class="c-modal-lbl">Название группы</div>
+                <input class="c-modal-inp" placeholder="Например: Логисты" @bind="groupName" @bind:event="oninput" />
+                <div class="c-modal-lbl">Участники</div>
+                <div class="c-members">
+                    @foreach (var e in AllOtherEmployees)
+                    {
+                        <label class="c-member">
+                            <input type="checkbox" checked="@groupMembers.Contains(e.Login)" @onchange="ev => ToggleMember(e.Login, ev)" />
+                            <span>@e.FullName</span>
+                            <span class="c-member-pos">@e.Position</span>
+                        </label>
+                    }
+                </div>
+                <div class="c-modal-actions">
+                    <button type="button" class="c-btn" @onclick="CloseGroupModal">Отмена</button>
+                    <button type="button" class="c-btn primary" @onclick="SaveGroup">@GroupModalBtn</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    string tab = "groups";
+    string search = "";
+    string msg = "";
+
+    ChatDialog? selected;
+    ChatMessage? replyTo;
+
+    bool groupModal;
+    bool groupEditMode;
+    string groupName = "";
+    HashSet<string> groupMembers = new();
+
+    ChatMessage? ctxMessage;
+    int ctxX;
+    int ctxY;
+
+    bool forwardModal;
+    ChatMessage? forwardTarget;
+
+    bool editModal;
+    ChatMessage? editTarget;
+    string editText = "";
+
+    // ---------- Вспомогательные значения (без кавычек внутри атрибутов разметки) ----------
+
+    string MyFio => AuthStore.Current?.FullName ?? "";
+
+    string GroupTabClass => tab == "groups" ? "c-tab on" : "c-tab";
+    string ChatTabClass => tab == "chats" ? "c-tab on" : "c-tab";
+
+    string GroupModalTitle => groupEditMode ? "Редактирование группы" : "Создать группу";
+    string GroupModalBtn => groupEditMode ? "Сохранить" : "Создать";
+
+    string RowClass(bool on) => on ? "c-row on" : "c-row";
+    string MsgClass(ChatMessage m) => IsOwn(m) ? "c-msg own" : "c-msg";
+    string AuthorLabel(ChatMessage m) => IsOwn(m) ? "Вы" : m.Author;
+
+    string HeadAvatar
+    {
+        get
+        {
+            if (selected == null) return "";
+            if (selected.IsGroup) return GroupInitials(selected);
+            var other = OtherEmployee();
+            return other == null ? "?" : other.Initials;
+        }
+    }
+
+    string HeadTitle
+    {
+        get
+        {
+            if (selected == null) return "";
+            if (selected.IsGroup) return selected.Name;
+            var other = OtherEmployee();
+            return other == null ? "Личный чат" : other.FullName;
+        }
+    }
+
+    string HeadSub
+    {
+        get
+        {
+            if (selected == null) return "";
+            if (!selected.IsGroup)
+            {
+                var other = OtherEmployee();
+                return other == null ? "" : other.Position;
+            }
+
+            var names = selected.Members
+                .Select(LoginName)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .ToList();
+
+            return names.Count == 0
+                ? "Участников нет"
+                : names.Count + " участн.: " + string.Join(", ", names);
+        }
+    }
+
+    // ---------- Списки ----------
+
+    List<ChatDialog> VisibleGroups => ChatStore.Groups
+        .Where(g => Match(g.Name) || g.Members.Any(l => Match(LoginName(l))))
+        .ToList();
+
+    List<Employee> ChatEmployees
+    {
+        get
+        {
+            var meCur = AuthStore.Current;
+            return EmployeeStore.Employees
+                .Where(e => meCur == null || e.Login != meCur.Login)
+                .Where(e => Match(e.FullName) || Match(e.Position) || Match(e.Email))
+                .OrderBy(e => e.FullName)
+                .ToList();
+        }
+    }
+
+    List<Employee> AllOtherEmployees => EmployeeStore.Employees
+        .Where(e => AuthStore.Current == null || e.Login != AuthStore.Current.Login)
+        .OrderBy(e => e.FullName)
+        .ToList();
+
+    // ---------- Утилиты ----------
+
+    bool Match(string? s) =>
+        string.IsNullOrWhiteSpace(search) ||
+        (s ?? "").Contains(search.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    string LoginName(string login) =>
+        EmployeeStore.Employees.FirstOrDefault(x => x.Login == login)?.FullName ?? login;
+
+    string Cut(string text) =>
+        string.IsNullOrEmpty(text) ? "" : (text.Length > 40 ? text.Substring(0, 40) + "…" : text);
+
+    // Заглушка: клик внутри модалки не должен закрывать её через фон
+    void Stop()
+    {
+    }
+
+    // ---------- Жизненный цикл ----------
+
+    protected override void OnInitialized()
+    {
+        ChatStore.Changed += OnStoreChanged;
+    }
+
+    void OnStoreChanged() => InvokeAsync(StateHasChanged);
+
+    // Сообщения открытого чата помечаются прочитанными сразу после отрисовки:
+    // цифра в списке диалогов и в меню «Чат» сразу обнуляется
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (selected != null)
+        {
+            MarkDialogRead(selected);
+        }
+    }
+
+    // ---------- Вкладки ----------
+
+    void OpenGroupsTab() => tab = "groups";
+
+    void OpenChatsTab() => tab = "chats";
+
+    // ---------- Диалоги ----------
+
+    void SelectDialog(ChatDialog d)
+    {
+        selected = d;
+        replyTo = null;
+        MarkDialogRead(d);
+    }
+
+    void MarkDialogRead(ChatDialog d)
+    {
+        var meCur = AuthStore.Current;
+        if (meCur == null || d == null) return;
+
+        var before = d.ReadBy.Count;
+        ChatStore.MarkRead(d, meCur.FullName);
+
+        if (d.ReadBy.Count != before)
+        {
+            SqliteStore.SaveAll();
+        }
+    }
+
+    void OpenPrivate(Employee e)
+    {
+        var meCur = AuthStore.Current;
+        if (meCur == null) return;
+
+        SelectDialog(ChatStore.GetPrivate(meCur.Login, e.Login));
+        tab = "chats";
+    }
+
+    bool IsSelectedPrivate(Employee e)
+    {
+        var meCur = AuthStore.Current;
+        if (meCur == null || selected == null || selected.IsGroup) return false;
+        return selected.Members.Contains(meCur.Login) && selected.Members.Contains(e.Login);
+    }
+
+    ChatDialog? FindPrivate(Employee e)
+    {
+        var meCur = AuthStore.Current;
+        if (meCur == null) return null;
+
+        return ChatStore.Dialogs.FirstOrDefault(d =>
+            !d.IsGroup && d.Members.Count == 2 &&
+            d.Members.Contains(meCur.Login) && d.Members.Contains(e.Login));
+    }
+
+    Employee? OtherEmployee()
+    {
+        var meCur = AuthStore.Current;
+        if (meCur == null || selected == null || selected.IsGroup) return null;
+
+        var otherLogin = selected.Members.FirstOrDefault(l => l != meCur.Login);
+        return EmployeeStore.Employees.FirstOrDefault(x => x.Login == otherLogin);
+    }
+
+    string GroupInitials(ChatDialog g)
+    {
+        var n = (g.Name ?? "").Trim();
+        if (n.Length == 0) return "#";
+
+        var parts = n.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+        {
+            return (parts[0][0].ToString() + parts[1][0].ToString()).ToUpper();
+        }
+
+        return n.Substring(0, Math.Min(2, n.Length)).ToUpper();
+    }
+
+    string GroupPreview(ChatDialog g)
+    {
+        var last = g.Last;
+        return last == null ? "" : " · " + last.Author + ": " + Cut(last.Text);
+    }
+
+    string PrivatePreview(Employee e)
+    {
+        var last = FindPrivate(e)?.Last;
+        return last == null ? e.Position : last.Author + ": " + Cut(last.Text);
+    }
+
+    bool IsOwn(ChatMessage m) =>
+        string.Equals(m.Author, MyFio, StringComparison.Ordinal);
+
+    // ---------- Контекстное меню ----------
+
+    void OpenCtx(MouseEventArgs e, ChatMessage m)
+    {
+        ctxMessage = m;
+        ctxX = (int)e.ClientX;
+        ctxY = (int)e.ClientY;
+    }
+
+    void CloseCtx() => ctxMessage = null;
+
+    void CtxReply()
+    {
+        if (ctxMessage != null)
+        {
+            replyTo = ctxMessage;
+        }
+        ctxMessage = null;
+    }
+
+    void CancelReply() => replyTo = null;
+
+    void CtxEdit()
+    {
+        if (ctxMessage == null || !IsOwn(ctxMessage))
+        {
+            ctxMessage = null;
+            return;
+        }
+
+        editTarget = ctxMessage;
+        editText = ctxMessage.Text;
+        editModal = true;
+        ctxMessage = null;
+    }
+
+    void SaveEdit()
+    {
+        if (selected != null && editTarget != null && !string.IsNullOrWhiteSpace(editText))
+        {
+            ChatStore.EditMessage(selected, editTarget, editText);
+            SqliteStore.SaveAll();
+        }
+
+        editModal = false;
+        editTarget = null;
+        editText = "";
+    }
+
+    void CloseEdit()
+    {
+        editModal = false;
+        editTarget = null;
+        editText = "";
+    }
+
+    void CtxForward()
+    {
+        if (ctxMessage == null) return;
+
+        forwardTarget = ctxMessage;
+        forwardModal = true;
+        ctxMessage = null;
+    }
+
+    void DoForward(Employee target)
+    {
+        var meCur = AuthStore.Current;
+        if (meCur == null || forwardTarget == null || selected == null) return;
+
+        var dialog = ChatStore.GetPrivate(meCur.Login, target.Login);
+        var sourceName = selected.IsGroup ? selected.Name : HeadTitle;
+        var text = "Переслано из «" + sourceName + "» от " + forwardTarget.Author + ":\n" + forwardTarget.Text;
+
+        ChatStore.Send(dialog, meCur.FullName, text);
+        SqliteStore.SaveAll();
+
+        forwardModal = false;
+        forwardTarget = null;
+
+        tab = "chats";
+        selected = dialog;
+        MarkDialogRead(dialog);
+    }
+
+    void CloseForward()
+    {
+        forwardModal = false;
+        forwardTarget = null;
+    }
+
+    // ---------- Отправка ----------
+
+    void SendMessage()
+    {
+        if (selected == null || string.IsNullOrWhiteSpace(msg)) return;
+
+        var meCur = AuthStore.Current;
+        if (meCur == null) return;
+
+        var text = msg.Trim();
+        if (replyTo != null)
+        {
+            text = "↪ Ответ " + replyTo.Author + ":\n" + replyTo.Text + "\n\n" + text;
+        }
+
+        ChatStore.Send(selected, meCur.FullName, text);
+        msg = "";
+        replyTo = null;
+        SqliteStore.SaveAll();
+    }
+
+    void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            SendMessage();
+        }
+    }
+
+    // ---------- Группы ----------
+
+    void OpenCreateGroup()
+    {
+        groupEditMode = false;
+        groupName = "";
+        groupMembers = new HashSet<string>();
+
+        if (AuthStore.Current != null)
+        {
+            groupMembers.Add(AuthStore.Current.Login);
+        }
+
+        groupModal = true;
+    }
+
+    void OpenEditGroup()
+    {
+        if (selected == null || !selected.IsGroup) return;
+
+        groupEditMode = true;
+        groupName = selected.Name;
+        groupMembers = new HashSet<string>(selected.Members);
+        groupModal = true;
+    }
+
+    void ToggleMember(string login, ChangeEventArgs e)
+    {
+        var isChecked = e.Value is bool b && b;
+
+        if (isChecked)
+        {
+            groupMembers.Add(login);
+        }
+        else
+        {
+            groupMembers.Remove(login);
+        }
+    }
+
+    void SaveGroup()
+    {
+        var name = (groupName ?? "").Trim();
+        if (name.Length == 0) return;
+
+        var meCur = AuthStore.Current;
+        var members = groupMembers.ToList();
+
+        if (meCur != null && !members.Contains(meCur.Login))
+        {
+
+            members.Add(meCur.Login);
+        }
+
+        if (groupEditMode && selected != null && selected.IsGroup)
+        {
+            ChatStore.Rename(selected, name);
+            ChatStore.SetMembers(selected, members);
+        }
+        else
+        {
+            selected = ChatStore.CreateGroup(name, members);
+            tab = "groups";
+        }
+
+        SqliteStore.SaveAll();
+        groupModal = false;
+    }
+
+    void CloseGroupModal() => groupModal = false;
+
+    public void Dispose()
+    {
+        ChatStore.Changed -= OnStoreChanged;
+    }
+}

@@ -1,0 +1,324 @@
+﻿@page "/notifications"
+@using Logistics.Web.Models
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@implements IDisposable
+
+<style>
+    .n-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+
+    .n-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: #ffffff;
+        margin: 0;
+    }
+
+    .n-badge {
+        font-size: 12px;
+        color: #a7f3d0;
+        background: rgba(255,255,255,.08);
+        border: 1px solid rgba(255,255,255,.18);
+        padding: 3px 10px;
+        border-radius: 12px;
+    }
+
+    .n-actions {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+    }
+
+    .n-btn {
+        height: 32px;
+        padding: 0 14px;
+        border: 1px solid rgba(255,255,255,.25);
+        border-radius: 8px;
+        background: rgba(255,255,255,.08);
+        color: #d1fae5;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+        .n-btn:hover {
+            background: rgba(255,255,255,.16);
+            color: #ffffff;
+        }
+
+        .n-btn.danger {
+            color: #fecaca;
+            border-color: rgba(252,165,165,.45);
+        }
+
+            .n-btn.danger:hover {
+                background: rgba(239,68,68,.2);
+            }
+
+        .n-btn:disabled {
+            opacity: .45;
+            cursor: default;
+        }
+
+    .n-tabs {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+    }
+
+    .n-tab {
+        background: rgba(255,255,255,.10);
+        color: #d1fae5;
+        border: 1px solid rgba(255,255,255,.18);
+        padding: 7px 14px;
+        border-radius: 9px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+        .n-tab:hover {
+            background: rgba(255,255,255,.18);
+            color: #ffffff;
+        }
+
+        .n-tab.on {
+            background: #00a884;
+            border-color: #00a884;
+            color: #ffffff;
+        }
+
+    .n-cnt {
+        background: rgba(0,0,0,.25);
+        border-radius: 10px;
+        padding: 0 6px;
+        font-size: 10px;
+    }
+
+    .n-tab.on .n-cnt {
+        background: rgba(0,0,0,.18);
+    }
+
+    .n-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-width: 900px;
+    }
+
+    .n-item {
+        background: #ffffff;
+        border-radius: 10px;
+        padding: 11px 14px 12px 12px;
+        color: #0f172a;
+        box-shadow: 0 4px 16px rgba(0,0,0,.12);
+        cursor: pointer;
+        border-left: 4px solid transparent;
+    }
+
+        .n-item.unread {
+            border-left-color: #00a884;
+        }
+
+        .n-item.read {
+            opacity: .7;
+        }
+
+        .n-item:hover {
+            box-shadow: 0 7px 20px rgba(0,0,0,.2);
+        }
+
+    .n-top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .n-type {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .4px;
+        text-transform: uppercase;
+        border-radius: 8px;
+        padding: 2px 8px;
+    }
+
+    .t-zayavka {
+        background: #ecfdf5;
+        color: #047857;
+        border: 1px solid #a7f3d0;
+    }
+
+    .t-chat {
+        background: #f5f3ff;
+        color: #6d28d9;
+        border: 1px solid #ddd6fe;
+    }
+
+    .t-other {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+    }
+
+    .n-date {
+        font-size: 11px;
+        color: #94a3b8;
+    }
+
+    .n-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #00a884;
+        flex-shrink: 0;
+    }
+
+    .n-del {
+        margin-left: auto;
+        width: 22px;
+        height: 22px;
+        border: none;
+        border-radius: 6px;
+        background: #f1f5f9;
+        color: #64748b;
+        font-size: 14px;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+        .n-del:hover {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+    .n-ttl {
+        font-size: 13px;
+        font-weight: 700;
+        margin-top: 6px;
+    }
+
+    .n-text {
+        font-size: 12px;
+        color: #334155;
+        margin-top: 2px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+
+    .n-empty {
+        background: #ffffff;
+        border-radius: 10px;
+        padding: 26px;
+        text-align: center;
+        color: #94a3b8;
+        font-size: 13px;
+        max-width: 900px;
+    }
+</style>
+
+<div class="n-head">
+    <h2 class="n-title">Уведомления</h2>
+    <span class="n-badge">Непрочитанных: @NotificationStore.UnreadCount()</span>
+
+    <div class="n-actions">
+        <button class="n-btn" disabled="@(NotificationStore.UnreadCount() == 0)" @onclick="MarkAllRead">Прочитать все</button>
+        <button class="n-btn danger" disabled="@(NotificationStore.Items.Count == 0)" @onclick="ClearAll">Очистить</button>
+    </div>
+</div>
+
+<div class="n-tabs">
+    <button class="@TabClass(false)" @onclick="() => onlyUnread = false">
+        Все <span class="n-cnt">@NotificationStore.Items.Count</span>
+    </button>
+    <button class="@TabClass(true)" @onclick="() => onlyUnread = true">
+        Непрочитанные <span class="n-cnt">@NotificationStore.UnreadCount()</span>
+    </button>
+</div>
+
+<div class="n-list">
+    @if (Filtered.Count == 0)
+    {
+        <div class="n-empty">
+            @(onlyUnread ? "Непрочитанных уведомлений нет" : "Уведомлений пока нет")
+        </div>
+    }
+
+    @foreach (var n in Filtered)
+    {
+        <div class="@ItemClass(n)" @onclick="() => ReadOne(n)">
+            <div class="n-top">
+                <span class="n-type @TypeClass(n.Type)">@TypeLabel(n.Type)</span>
+                <span class="n-date">@n.DateStr</span>
+                @if (!n.IsRead)
+                {
+                    <span class="n-dot"></span>
+                }
+                <button class="n-del" title="Удалить" @onclick:stopPropagation="true" @onclick="() => RemoveOne(n)">×</button>
+            </div>
+            <div class="n-ttl">@n.Title</div>
+            <div class="n-text">@n.Text</div>
+        </div>
+    }
+</div>
+
+@code {
+    bool onlyUnread;
+
+    List<AppNotification> Filtered => onlyUnread
+        ? NotificationStore.Items.Where(x => !x.IsRead).ToList()
+        : NotificationStore.Items.ToList();
+
+    protected override void OnInitialized()
+    {
+        NotificationStore.Changed += OnStoreChanged;
+    }
+
+    void OnStoreChanged() => InvokeAsync(StateHasChanged);
+
+    string TabClass(bool unreadTab) => onlyUnread == unreadTab ? "n-tab on" : "n-tab";
+
+    string ItemClass(AppNotification n) => n.IsRead ? "n-item read" : "n-item unread";
+
+    string TypeLabel(string type) => string.IsNullOrWhiteSpace(type) ? "Прочее" : type;
+
+    string TypeClass(string type) => type switch
+    {
+        "Заявка" => "t-zayavka",
+        "Чат" => "t-chat",
+        _ => "t-other"
+    };
+
+    void ReadOne(AppNotification n)
+    {
+        if (n.IsRead) return;
+        NotificationStore.MarkRead(n);
+    }
+
+    void MarkAllRead() => NotificationStore.MarkAllRead();
+
+    void RemoveOne(AppNotification n) => NotificationStore.Remove(n);
+
+    async Task ClearAll()
+    {
+        if (NotificationStore.Items.Count == 0) return;
+
+        var ok = await JS.InvokeAsync<bool>("confirm", "Удалить все уведомления?");
+        if (ok) NotificationStore.Clear();
+    }
+
+    public void Dispose()
+    {
+        NotificationStore.Changed -= OnStoreChanged;
+    }
+}

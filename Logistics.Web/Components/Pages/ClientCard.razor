@@ -1,0 +1,606 @@
+﻿@page "/client/{Id}"
+@inject NavigationManager Nav
+@using System
+@using System.Linq
+@using Logistics.Web.Models
+
+<style>
+    .cc-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .cc-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #ffffff;
+        margin: 0;
+    }
+
+    .cc-back {
+        margin-left: auto;
+        color: #a7f3d0;
+        font-size: 12px;
+        border: 1px solid rgba(255,255,255,.25);
+        padding: 5px 12px;
+        border-radius: 6px;
+        background: none;
+        cursor: pointer;
+        font-family: inherit;
+    }
+
+        .cc-back:hover {
+            background: rgba(255,255,255,.08);
+        }
+
+    .cc-page {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 14px;
+        align-items: start;
+        max-width: 1250px;
+    }
+
+    .cc-card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 16px 18px;
+        color: #0f172a;
+        box-shadow: 0 4px 16px rgba(0,0,0,.15);
+        box-sizing: border-box;
+    }
+
+    .cc-lbl {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .3px;
+        text-transform: uppercase;
+        color: #64748b;
+        margin: 10px 0 3px;
+    }
+
+    .cc-inp, .cc-ta {
+        width: 100%;
+        border: 1px solid #cbd5e1;
+        border-radius: 7px;
+        background: #f8fafc;
+        color: #0f172a;
+        font-size: 13px;
+        padding: 0 10px;
+        height: 32px;
+        outline: none;
+        box-sizing: border-box;
+        font-family: inherit;
+    }
+
+    .cc-ta {
+        height: 56px;
+        padding: 6px 10px;
+        resize: vertical;
+    }
+
+        .cc-inp:focus, .cc-ta:focus {
+            border-color: #00a884;
+            background: #ffffff;
+        }
+
+    .cc-hint {
+        font-size: 10.5px;
+        color: #94a3b8;
+        margin-top: 2px;
+    }
+
+    .cc-row2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .cc-row3 {
+        display: grid;
+        grid-template-columns: minmax(0,1fr) minmax(0,1fr) 42px;
+        gap: 8px;
+        align-items: end;
+        margin-top: 6px;
+    }
+
+    .cc-list {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: #f8fafc;
+        max-height: 140px;
+        overflow-y: auto;
+        padding: 4px;
+        box-sizing: border-box;
+        width: 100%;
+    }
+
+    .cc-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 8px;
+        border-radius: 6px;
+        font-size: 12.5px;
+        color: #1e293b;
+    }
+
+        .cc-item:hover {
+            background: #ecfdf5;
+        }
+
+    .cc-item-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .cc-del {
+        margin-left: auto;
+        border: none;
+        background: #f1f5f9;
+        color: #64748b;
+        border-radius: 5px;
+        width: 22px;
+        height: 22px;
+        cursor: pointer;
+        line-height: 1;
+        flex-shrink: 0;
+        font-size: 13px;
+    }
+
+        .cc-del:hover {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+    .cc-empty {
+        font-size: 11.5px;
+        color: #94a3b8;
+        padding: 10px;
+        text-align: center;
+    }
+
+    .cc-btn {
+        height: 32px;
+        padding: 0 14px;
+        border-radius: 7px;
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        color: #334155;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+    }
+
+        .cc-btn:hover {
+            background: #f1f5f9;
+        }
+
+        .cc-btn.add {
+            width: 42px;
+            padding: 0;
+            font-size: 18px;
+            background: #00a884;
+            border-color: #00a884;
+            color: #ffffff;
+        }
+
+            .cc-btn.add:hover {
+                background: #029474;
+            }
+
+    .cc-save {
+        height: 38px;
+        padding: 0 28px;
+        border: none;
+        border-radius: 8px;
+        background: #00a884;
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        margin-top: 16px;
+        font-family: inherit;
+    }
+
+        .cc-save:hover {
+            background: #029474;
+        }
+
+    .chk-list {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: #f8fafc;
+        height: 110px;
+        overflow-y: auto;
+        padding: 6px 8px;
+        box-sizing: border-box;
+        margin-top: 4px;
+    }
+
+    .chk {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        padding: 2px 0;
+        color: #1e293b;
+        cursor: pointer;
+    }
+
+        .chk:hover {
+            color: #0f766e;
+        }
+
+    .cc-side-title {
+        font-size: 15px;
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 6px;
+    }
+
+    .cc-sub {
+        font-size: 10.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .3px;
+        color: #64748b;
+        margin: 12px 0 5px;
+    }
+
+    .cc-task {
+        display: block;
+        width: 100%;
+        text-align: left;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        border-radius: 7px;
+        padding: 7px 9px;
+        font-size: 12px;
+        color: #0f172a;
+        margin-bottom: 5px;
+        cursor: pointer;
+        font-family: inherit;
+        overflow-wrap: anywhere;
+        box-sizing: border-box;
+    }
+
+        .cc-task:hover {
+            background: #ecfdf5;
+            border-color: #a7f3d0;
+        }
+
+    @@media (max-width: 980px) {
+        .cc-page {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+
+    @@media (max-width: 640px) {
+        .cc-row2, .cc-row3 {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="cc-head">
+    <h2 class="cc-title">@(isNew ? "Новый клиент" : "Карточка клиента")</h2>
+    <button type="button" class="cc-back" @onclick="GoBack">← К клиентам</button>
+</div>
+
+@if (notFound)
+{
+    <div class="cc-card">Клиент не найден</div>
+}
+else
+{
+    <div class="cc-page">
+        <div class="cc-card">
+            <label class="cc-lbl">Название</label>
+            <input class="cc-inp" placeholder="Пример: ООО СтройТорг" @bind="client.Name" @bind:event="oninput" />
+            <div class="cc-hint">Краткое название клиента. Пойдёт в ЭТрН: Грузополучатель</div>
+
+            <label class="cc-lbl">Краткое описание</label>
+            <textarea class="cc-ta" placeholder="Сфера, особенности. Пример: Сеть складов, разгрузка с 8 до 17"
+                      @bind="client.ShortDesc" @bind:event="oninput"></textarea>
+
+            <div class="cc-row2">
+                <div>
+                    <label class="cc-lbl">ИНН</label>
+                    <input class="cc-inp" placeholder="7700000000" @bind="client.Inn" @bind:event="oninput" />
+                </div>
+                <div>
+                    <label class="cc-lbl">КПП</label>
+                    <input class="cc-inp" placeholder="770001001" @bind="client.Kpp" @bind:event="oninput" />
+                </div>
+            </div>
+
+            <label class="cc-lbl">Идентификатор ЭДО (Saby)</label>
+            <input class="cc-inp" placeholder="2BE-0987654321" @bind="client.EdoId" @bind:event="oninput" />
+            <div class="cc-hint">ID контрагента в Saby для отправки ЭТрН / ЭДО</div>
+
+            <label class="cc-lbl">Направления: загрузка — выгрузка</label>
+            <div class="cc-list">
+                @if (client.Routes.Count == 0)
+                {
+                    <div class="cc-empty">Направлений нет</div>
+                }
+                @foreach (var r in client.Routes.ToList())
+                {
+                    <div class="cc-item">
+                        <span class="cc-item-text">📍 @r.Display</span>
+                        <button type="button" class="cc-del" title="Удалить" @onclick="() => RemoveRoute(r)">×</button>
+                    </div>
+                }
+            </div>
+
+            <div class="cc-row3">
+                <input class="cc-inp" placeholder="Загрузка: Москва, Склад №1" @bind="newLoading" @bind:event="oninput" />
+                <input class="cc-inp" placeholder="Выгрузка: Казань, ул. Складская, 5" @bind="newUnloading" @bind:event="oninput" />
+                <button type="button" class="cc-btn add" title="Добавить направление" @onclick="AddRoute">+</button>
+            </div>
+
+            <div class="cc-row2">
+                <div>
+                    <label class="cc-lbl">Тип ТС</label>
+                    <input class="cc-inp" placeholder="Поиск ТС..." @bind="vehicleSearch" @bind:event="oninput" />
+                    <div class="chk-list">
+                        @foreach (var v in FilteredVehicles)
+                        {
+                            <label class="chk"><input type="checkbox" @bind="v.IsChecked" /> @v.Name</label>
+                        }
+                    </div>
+                </div>
+                <div>
+                    <label class="cc-lbl">Тип груза</label>
+                    <input class="cc-inp" placeholder="Поиск груза..." @bind="cargoSearch" @bind:event="oninput" />
+                    <div class="chk-list">
+                        @foreach (var v in FilteredCargos)
+                        {
+                            <label class="chk"><input type="checkbox" @bind="v.IsChecked" /> @v.Name</label>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="cc-row2">
+                <div>
+                    <label class="cc-lbl">Способ загрузки</label>
+                    <div class="chk-list">
+                        @foreach (var v in LoadItems)
+                        {
+                            <label class="chk"><input type="checkbox" @bind="v.IsChecked" /> @v.Name</label>
+                        }
+                    </div>
+                </div>
+                <div>
+                    <label class="cc-lbl">Способ выгрузки</label>
+                    <div class="chk-list">
+                        @foreach (var v in UnloadItems)
+                        {
+                            <label class="chk"><input type="checkbox" @bind="v.IsChecked" /> @v.Name</label>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <label class="cc-lbl">Контакты клиента</label>
+            <div class="cc-list">
+                @if (client.Contacts.Count == 0)
+                {
+                    <div class="cc-empty">Контактов пока нет</div>
+                }
+                @foreach (var c in client.Contacts.ToList())
+                {
+                    <div class="cc-item">
+                        <span class="cc-item-text">👤 @c.Display</span>
+                        <button type="button" class="cc-del" title="Удалить" @onclick="() => RemoveContact(c)">×</button>
+                    </div>
+                }
+            </div>
+
+            <div class="cc-row2">
+                <div>
+                    <label class="cc-lbl">ФИО сотрудника клиента</label>
+                    <input class="cc-inp" placeholder="Иванов Иван Иванович" @bind="cFio" @bind:event="oninput" />
+                </div>
+                <div>
+                    <label class="cc-lbl">Должность</label>
+                    <input class="cc-inp" placeholder="Кладовщик" @bind="cPos" @bind:event="oninput" />
+                </div>
+            </div>
+
+            <div class="cc-row2">
+                <div>
+                    <label class="cc-lbl">Номер телефона</label>
+                    <input class="cc-inp" placeholder="+7 (900) 000-00-00" @bind="cPhone" @bind:event="oninput" />
+                </div>
+                <div>
+                    <label class="cc-lbl">E-Mail</label>
+                    <input class="cc-inp" placeholder="sklad@mail.ru" @bind="cEmail" @bind:event="oninput" />
+                </div>
+            </div>
+
+            <div style="margin-top:10px">
+                <button type="button" class="cc-btn" @onclick="AddContact">Добавить контакт</button>
+            </div>
+
+            <button type="button" class="cc-save" @onclick="Save">Сохранить</button>
+        </div>
+
+        <div class="cc-card">
+            <div class="cc-side-title">Заявки клиента</div>
+
+            <div class="cc-sub">Активные / В работе</div>
+            @if (ActiveTasks.Count == 0)
+            {
+                <div class="cc-empty">Нет активных заявок</div>
+            }
+            @foreach (var t in ActiveTasks)
+            {
+                <button type="button" class="cc-task" @onclick="() => OpenTask(t.Id)">@t.Title</button>
+            }
+
+            <div class="cc-sub">Закрытые</div>
+            @if (ClosedTasks.Count == 0)
+            {
+                <div class="cc-empty">Нет закрытых заявок</div>
+            }
+            @foreach (var t in ClosedTasks)
+            {
+                <button type="button" class="cc-task" @onclick="() => OpenTask(t.Id)">@t.Title</button>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    class CheckItem
+    {
+        public string Name { get; set; } = "";
+        public bool IsChecked { get; set; }
+    }
+
+    Client client = new();
+    bool isNew;
+    bool notFound;
+
+    string vehicleSearch = "";
+    string cargoSearch = "";
+
+    List<CheckItem> VehicleItems = new();
+    List<CheckItem> CargoItems = new();
+    List<CheckItem> LoadItems = new();
+    List<CheckItem> UnloadItems = new();
+
+    string newLoading = "";
+    string newUnloading = "";
+
+    string cFio = "";
+    string cPos = "";
+    string cPhone = "";
+    string cEmail = "";
+
+    protected override void OnInitialized()
+    {
+        if (string.Equals(Id, "new", StringComparison.OrdinalIgnoreCase))
+        {
+            isNew = true;
+            client = new Client();
+        }
+        else
+        {
+            var found = ClientStore.Clients.FirstOrDefault(x => x.Id.ToString() == Id);
+            if (found == null) { notFound = true; return; }
+            client = found;
+        }
+
+        VehicleItems = Dictionaries.VehicleTypes
+            .Select(n => new CheckItem { Name = n, IsChecked = client.VehicleTypes.Contains(n) })
+            .ToList();
+
+        CargoItems = Dictionaries.CargoTypes
+            .Select(n => new CheckItem { Name = n, IsChecked = client.CargoTypes.Contains(n) })
+            .ToList();
+
+        LoadItems = Dictionaries.LoadingMethods
+            .Select(n => new CheckItem { Name = n, IsChecked = client.LoadingMethods.Contains(n) })
+            .ToList();
+
+        UnloadItems = Dictionaries.LoadingMethods
+            .Select(n => new CheckItem { Name = n, IsChecked = client.UnloadingMethods.Contains(n) })
+            .ToList();
+    }
+
+    List<CheckItem> FilteredVehicles => Filter(VehicleItems, vehicleSearch);
+    List<CheckItem> FilteredCargos => Filter(CargoItems, cargoSearch);
+
+    List<CheckItem> Filter(List<CheckItem> source, string query) =>
+        string.IsNullOrWhiteSpace(query)
+            ? source
+            : source.Where(x => (x.Name ?? "").Contains(query.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
+
+    List<WorkTask> ClientTasks => TaskStore.Tasks
+        .Where(t => string.Equals((t.ClientName ?? "").Trim(), (client.Name ?? "").Trim(), StringComparison.OrdinalIgnoreCase))
+        .OrderBy(t => t.Deadline ?? DateTime.MaxValue)
+        .ToList();
+
+    List<WorkTask> ActiveTasks => ClientTasks
+        .Where(t => t.Status != "Выполнена" && t.Status != "Не актуально")
+        .ToList();
+
+    List<WorkTask> ClosedTasks => ClientTasks
+        .Where(t => t.Status == "Выполнена" || t.Status == "Не актуально")
+        .ToList();
+
+    void OpenTask(Guid id) => Nav.NavigateTo("/task/" + id);
+
+    void AddRoute()
+    {
+        var load = (newLoading ?? "").Trim();
+        var unload = (newUnloading ?? "").Trim();
+        if (load.Length == 0 && unload.Length == 0) return;
+
+        client.Routes.Add(new ClientRoute { Loading = load, Unloading = unload });
+        newLoading = "";
+        newUnloading = "";
+    }
+
+    void RemoveRoute(ClientRoute route) => client.Routes.Remove(route);
+
+    void AddContact()
+    {
+        var fio = (cFio ?? "").Trim();
+        if (fio.Length == 0) return;
+
+        client.Contacts.Add(new ClientContact
+        {
+            Fio = fio,
+            Position = (cPos ?? "").Trim(),
+            Phone = (cPhone ?? "").Trim(),
+            Email = (cEmail ?? "").Trim()
+        });
+
+        cFio = "";
+        cPos = "";
+        cPhone = "";
+        cEmail = "";
+    }
+
+    void RemoveContact(ClientContact contact) => client.Contacts.Remove(contact);
+
+    void GoBack() => Nav.NavigateTo("/clients");
+
+    void Save()
+    {
+        if (string.IsNullOrWhiteSpace(client.Name))
+        {
+            client.Name = "Без названия";
+        }
+
+        client.VehicleTypes = VehicleItems.Where(x => x.IsChecked).Select(x => x.Name).ToList();
+        client.CargoTypes = CargoItems.Where(x => x.IsChecked).Select(x => x.Name).ToList();
+        client.LoadingMethods = LoadItems.Where(x => x.IsChecked).Select(x => x.Name).ToList();
+        client.UnloadingMethods = UnloadItems.Where(x => x.IsChecked).Select(x => x.Name).ToList();
+
+        if (isNew)
+        {
+            ClientStore.Clients.Add(client);
+            NotificationStore.Add("Клиент", "Добавлен клиент", client.Name);
+        }
+        else
+        {
+            NotificationStore.Add("Клиент", "Клиент изменён", client.Name);
+        }
+
+        SqliteStore.SaveAll();
+        Nav.NavigateTo("/clients");
+    }
+}

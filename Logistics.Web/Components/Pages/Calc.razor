@@ -1,0 +1,889 @@
+﻿@page "/calculator"
+@using System.IO
+@using System.Linq
+@using System.Text.Json
+@using Microsoft.Data.Sqlite
+
+<style>
+    .calc-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #ffffff;
+        margin-bottom: 12px;
+    }
+
+    .calc-tabs {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+    }
+
+    .ctab {
+        background: rgba(255,255,255,.10);
+        color: #d1fae5;
+        border: 1px solid rgba(255,255,255,.18);
+        padding: 8px 16px;
+        border-radius: 9px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+        .ctab:hover {
+            background: rgba(255,255,255,.18);
+            color: #fff;
+        }
+
+        .ctab.on {
+            background: #00a884;
+            border-color: #00a884;
+            color: #fff;
+        }
+
+    .cnt {
+        background: rgba(0,0,0,.25);
+        border-radius: 10px;
+        padding: 1px 7px;
+        font-size: 11px;
+        margin-left: 4px;
+    }
+
+    .ccard {
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 16px 18px;
+        box-shadow: 0 10px 30px rgba(0,0,0,.18);
+        color: #0f172a;
+    }
+
+    .calc-cols {
+        display: grid;
+        grid-template-columns: minmax(0,1fr) 330px;
+        gap: 14px;
+        align-items: start;
+    }
+
+    .sec {
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: .5px;
+        text-transform: uppercase;
+        color: #0f766e;
+        margin: 14px 0 8px;
+    }
+
+        .sec.first {
+            margin-top: 0;
+        }
+
+    .lbl {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+    }
+
+    .inp {
+        width: 100%;
+        height: 34px;
+        padding: 0 9px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: #f8fafc;
+        font-size: 13px;
+        color: #0f172a;
+        outline: none;
+    }
+
+        .inp:focus {
+            border-color: #00a884;
+            background: #ffffff;
+        }
+
+        .inp.ro {
+            background: #f1f5f9;
+            color: #334155;
+        }
+
+        .inp.zero {
+            background: #fefce8;
+            font-weight: 700;
+        }
+
+        .inp.act {
+            border-color: #00a884;
+            background: #ecfdf5;
+            box-shadow: 0 0 0 3px rgba(0,168,132,.15);
+            font-weight: 700;
+        }
+
+    .row2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+
+    .chks {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin: 4px 0 6px;
+    }
+
+    .chk {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 13px;
+        color: #1e293b;
+    }
+
+    .prow {
+        display: grid;
+        grid-template-columns: 200px minmax(0,1fr) 74px;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 5px;
+    }
+
+        .prow .pl {
+            font-size: 13px;
+            color: #334155;
+        }
+
+        .prow .pu {
+            font-size: 11px;
+            color: #94a3b8;
+        }
+
+        .prow.bold .pl {
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+    .res {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 9px 0;
+        border-bottom: 1px dashed #e2e8f0;
+    }
+
+        .res:last-of-type {
+            border-bottom: none;
+        }
+
+        .res .rl {
+            font-size: 13px;
+            color: #475569;
+        }
+
+        .res .rv {
+            font-size: 16px;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .res.good .rv {
+            color: #047857;
+        }
+
+        .res.bad .rv {
+            color: #b91c1c;
+        }
+
+    .btn2 {
+        height: 36px;
+        padding: 0 16px;
+        border: 1px solid #cbd5e1;
+        border-radius: 9px;
+        background: #ffffff;
+        color: #334155;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+        .btn2:hover {
+            background: #f1f5f9;
+        }
+
+        .btn2.main {
+            background: #00a884;
+            border-color: #00a884;
+            color: #ffffff;
+        }
+
+            .btn2.main:hover {
+                background: #029474;
+            }
+
+        .btn2.danger {
+            color: #b91c1c;
+            border-color: #fecaca;
+        }
+
+    .btns {
+        display: flex;
+        gap: 8px;
+        margin-top: 14px;
+        flex-wrap: wrap;
+    }
+
+    .msg {
+        background: #fef2f2;
+        color: #b91c1c;
+        border: 1px solid #fecaca;
+        border-radius: 8px;
+        padding: 8px 11px;
+        font-size: 12px;
+        margin-bottom: 10px;
+    }
+
+        .msg.ok {
+            background: #ecfdf5;
+            color: #047857;
+            border-color: #a7f3d0;
+        }
+
+    .hist-grid {
+        display: grid;
+        grid-template-columns: minmax(0,1fr) 380px;
+        gap: 14px;
+        align-items: start;
+    }
+
+    .hlist {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 10px;
+        max-height: 520px;
+        overflow-y: auto;
+        padding-right: 4px;
+    }
+
+    .hitem {
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 9px 11px;
+        cursor: pointer;
+        background: #f8fafc;
+    }
+
+        .hitem:hover {
+            border-color: #94a3b8;
+        }
+
+        .hitem.on {
+            border-color: #00a884;
+            background: #ecfdf5;
+        }
+
+    .hdate {
+        font-size: 11px;
+        color: #94a3b8;
+    }
+
+    .hroute {
+        font-size: 13px;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .hmeta {
+        display: flex;
+        gap: 10px;
+        font-size: 11px;
+        color: #475569;
+        flex-wrap: wrap;
+    }
+
+    .hp {
+        font-weight: 700;
+        color: #047857;
+    }
+
+    .detail {
+        white-space: pre-wrap;
+        font-size: 13px;
+        color: #1e293b;
+        font-family: inherit;
+        line-height: 1.6;
+        margin: 0;
+    }
+
+    .empty {
+        font-size: 12px;
+        color: #94a3b8;
+        padding: 8px 0;
+    }
+
+    .linkcard {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-bottom: 10px;
+    }
+
+        .linkcard b {
+            font-size: 13px;
+            color: #0f172a;
+        }
+
+        .linkcard .url {
+            font-size: 11px;
+            color: #94a3b8;
+            margin: 2px 0 8px;
+        }
+
+    .note {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-bottom: 10px;
+    }
+
+    .modebar {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #ecfdf5;
+        color: #047857;
+        border: 1px solid #a7f3d0;
+        border-radius: 12px;
+        padding: 3px 10px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+</style>
+
+<div class="calc-title">Калькулятор рейсов М-Пласт (по ставке)</div>
+
+<div class="calc-tabs">
+    <button class="@TabClass(0)" @onclick="() => tab = 0">Калькулятор</button>
+    <button class="@TabClass(1)" @onclick="() => tab = 1">История расчётов <span class="cnt">@records.Count</span></button>
+    <button class="@TabClass(2)" @onclick="() => tab = 2">Справочники</button>
+    <button class="@TabClass(3)" @onclick="() => tab = 3">Настройки</button>
+</div>
+
+@if (tab == 0)
+{
+    <div class="calc-cols">
+
+        <div class="ccard">
+            <div class="sec first">Рейс</div>
+
+            <div class="row2">
+                <div>
+                    <label class="lbl">Считать в</label>
+                    <select class="inp" @bind="mode" @bind:after="Recalc">
+                        <option value="km">Руб/Км</option>
+                        <option value="ton">Руб/Тонн</option>
+                    </select>
+                    <div class="note" style="margin-top:5px">
+                        Активно: <span class="modebar">@(kmMode ? "₽ за километр" : "₽ за тонну")</span>
+                    </div>
+                </div>
+                <div>
+                    <label class="lbl">Расчёт на, тонн</label>
+                    <input type="number" class="inp" @bind="calcOn" @bind:after="Recalc" />
+                </div>
+            </div>
+
+            <div class="row2">
+                <div>
+                    <label class="lbl">Пункт загрузки</label>
+                    <input class="inp" @bind="loading" @bind:event="oninput" />
+                </div>
+                <div>
+                    <label class="lbl">Пункт выгрузки</label>
+                    <input class="inp" @bind="unloading" @bind:event="oninput" />
+                </div>
+            </div>
+
+            <div class="chks">
+                <label class="chk"><input type="checkbox" @bind="roundTrip" @bind:after="Recalc" /> Учесть кругорейс?</label>
+                <label class="chk"><input type="checkbox" @bind="leasingTruckOn" @bind:after="Recalc" /> Учесть лизинг тягача?</label>
+                <label class="chk"><input type="checkbox" @bind="leasingTrailerOn" @bind:after="Recalc" /> Учесть лизинг прицепа?</label>
+            </div>
+
+            <div class="sec">Параметры перевозки</div>
+
+            <div class="prow"><span class="pl">Километраж</span><input type="number" class="inp" @bind="km" @bind:after="Recalc" /><span class="pu">км</span></div>
+            <div class="prow"><span class="pl">Пробег на круг</span><input class="inp ro" value="@F(roundKm)" readonly /><span class="pu">км</span></div>
+            <div class="prow"><span class="pl">Зарплата на рейс</span><input type="number" class="inp" @bind="salary" @bind:after="Recalc" /><span class="pu">₽/рейс</span></div>
+            <div class="prow"><span class="pl">Топливо без НДС</span><input class="inp ro" value="@F(fuelNoNds)" readonly /><span class="pu">₽</span></div>
+            <div class="prow"><span class="pl">Лизинг тягача за рейс</span><input class="inp ro" value="@F(leasTruckTrip)" readonly /><span class="pu">₽</span></div>
+            <div class="prow"><span class="pl">Лизинг прицепа за рейс</span><input class="inp ro" value="@F(leasTrailerTrip)" readonly /><span class="pu">₽</span></div>
+            <div class="prow"><span class="pl">ОСАГО</span><input class="inp ro" value="@F(osagoTrip)" readonly /><span class="pu">₽</span></div>
+            <div class="prow"><span class="pl">КАСКО тягача</span><input class="inp ro" value="@F(kaskoTruckTrip)" readonly /><span class="pu">₽</span></div>
+            <div class="prow"><span class="pl">КАСКО прицепа</span><input class="inp ro" value="@F(kaskoTrailerTrip)" readonly /><span class="pu">₽</span></div>
+            <div class="prow"><span class="pl">Платон</span><input class="inp ro" value="@F(platonTrip)" readonly /><span class="pu">₽</span></div>
+            <div class="prow"><span class="pl">Амортизация тягача</span><input class="inp ro" value="@F(amorTruck)" readonly /><span class="pu">₽</span></div>
+            <div class="prow"><span class="pl">Амортизация прицепа</span><input class="inp ro" value="@F(amorTrailer)" readonly /><span class="pu">₽</span></div>
+            <div class="prow"><span class="pl">Административные расходы</span><input class="inp ro" value="@F(adminTrip)" readonly /><span class="pu">₽</span></div>
+            <div class="prow"><span class="pl">Автодор</span><input type="number" class="inp" @bind="avtodor" @bind:after="Recalc" /><span class="pu">₽</span></div>
+            <div class="prow"><span class="pl">Норма ремонтов</span><input class="inp ro" value="@F(repairTrip)" readonly /><span class="pu">₽</span></div>
+            <div class="prow"><span class="pl">Дней на 1 рейс</span><input class="inp ro" value="@F(days)" readonly /><span class="pu">дней</span></div>
+            <div class="prow bold"><span class="pl">Себестоимость рейса</span><input class="inp ro" value="@F(cost)" readonly /><span class="pu">₽</span></div>
+            <div class="prow bold"><span class="pl">Ставка для выхода в 0</span><input class="inp zero" value="@F(zeroTon)" readonly /><span class="pu">₽/т</span></div>
+            <div class="prow bold"><span class="pl">Ставка для выхода в 0</span><input class="inp zero" value="@F(zeroKm)" readonly /><span class="pu">₽/км</span></div>
+            <div class="prow"><span class="pl">Предлагаемая ставка</span><input type="number" class="@OfferClass(true)" @bind="offerKm" @bind:after="Recalc" /><span class="pu">₽/км</span></div>
+            <div class="prow"><span class="pl">Предлагаемая ставка</span><input type="number" class="@OfferClass(false)" @bind="offerTon" @bind:after="Recalc" /><span class="pu">₽/т</span></div>
+        </div>
+
+        <div class="ccard">
+            <div class="sec first">Итог</div>
+
+            @if (!string.IsNullOrEmpty(msg))
+            {
+                <div class="msg @MsgClass()">@msg</div>
+            }
+
+            <div class="res">
+                <span class="rl">Выручка</span>
+                <span class="rv">@F(revenue) ₽</span>
+            </div>
+            <div class="res @ProfitClass()">
+                <span class="rl">ОП</span>
+                <span class="rv">@F(profit) ₽</span>
+            </div>
+            <div class="res @ProfitClass()">
+                <span class="rl">ОП, %</span>
+                <span class="rv">@profitPct.ToString("N2") %</span>
+            </div>
+
+            <div class="btns">
+                <button class="btn2 main" @onclick="Recalc">Посчитать</button>
+                <button class="btn2" @onclick="SaveCalc">Сохранить расчёт</button>
+            </div>
+
+            <div class="note" style="margin-top:12px">
+                Режим: @ModeName() · кругорейс: @(roundTrip ? "да" : "нет")
+            </div>
+        </div>
+
+    </div>
+}
+else if (tab == 1)
+{
+    <div class="hist-grid">
+
+        <div class="ccard">
+            <input class="inp" placeholder="Поиск по маршруту, режиму или дате..." @bind="search" @bind:event="oninput" />
+
+            <div class="hlist">
+                @if (Filtered.Count == 0)
+                {
+                    <div class="empty">Расчётов нет</div>
+                }
+                @foreach (var r in Filtered)
+                {
+                    <div class="@RecClass(r)" @onclick="() => Select(r)">
+                        <div class="hdate">@r.DateStr</div>
+                        <div class="hroute">@r.Route</div>
+                        <div class="hmeta">
+                            <span>@r.Mode</span>
+                            <span>@r.CostStr</span>
+                            <span class="hp">@r.ProfitStr</span>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="btns">
+                <button class="btn2 main" @onclick="OpenSelected">Открыть</button>
+                <button class="btn2 danger" @onclick="DeleteSelected">Удалить</button>
+            </div>
+        </div>
+
+        <div class="ccard">
+            <div class="sec first">Карточка расчёта</div>
+            @if (selected == null)
+            {
+                <div class="empty">Выберите расчёт слева</div>
+            }
+            else
+            {
+                <pre class="detail">@selected.Detail</pre>
+            }
+        </div>
+
+    </div>
+}
+else if (tab == 2)
+{
+    <div class="ccard">
+        <div class="sec first">Справочники</div>
+        <div class="note">Нажмите, чтобы открыть сайт в новой вкладке браузера</div>
+
+        <div class="linkcard">
+            <b>Автодор — расчёт платной дороги</b>
+            <div class="url">https://avtodor-tr.ru/road/calculation/</div>
+            <a class="btn2 main" href="https://avtodor-tr.ru/road/calculation/#initial" target="_blank" rel="noopener">Открыть Автодор</a>
+        </div>
+
+        <div class="linkcard">
+            <b>Яндекс Карты — километраж</b>
+            <div class="url">Построение маршрута и замер расстояния</div>
+            <a class="btn2 main" href="https://yandex.ru/maps/213/moscow/" target="_blank" rel="noopener">Открыть Яндекс Карты</a>
+        </div>
+
+        <div class="linkcard">
+            <b>Весовые рамки / Платон</b>
+            <div class="url">Весовой контроль</div>
+            <a class="btn2 main" href="https://nerudas.ru/vesy-platon/vesovoj-kontrol" target="_blank" rel="noopener">Открыть Весовые рамки</a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="ccard">
+        <div class="sec first">Входные затраты</div>
+
+        <div class="prow"><span class="pl">Стоимость топлива</span><input type="number" class="inp" @bind="fuelPrice" @bind:after="Recalc" /><span class="pu">₽/л</span></div>
+        <div class="prow"><span class="pl">Норма ремонтов</span><input type="number" class="inp" @bind="repairNorm" @bind:after="Recalc" /><span class="pu">₽/мес</span></div>
+        <div class="prow"><span class="pl">Платон за километр</span><input type="number" class="inp" @bind="platonPerKm" @bind:after="Recalc" /><span class="pu">₽/км</span></div>
+        <div class="prow"><span class="pl">Административные расходы</span><input type="number" class="inp" @bind="admin" @bind:after="Recalc" /><span class="pu">₽</span></div>
+        <div class="prow"><span class="pl">ОСАГО</span><input type="number" class="inp" @bind="osago" @bind:after="Recalc" /><span class="pu">₽</span></div>
+        <div class="prow"><span class="pl">КАСКО прицепа</span><input type="number" class="inp" @bind="kaskoTrailer" @bind:after="Recalc" /><span class="pu">₽</span></div>
+        <div class="prow"><span class="pl">КАСКО тягача</span><input type="number" class="inp" @bind="kaskoTruck" @bind:after="Recalc" /><span class="pu">₽</span></div>
+        <div class="prow"><span class="pl">Лизинг прицепа</span><input type="number" class="inp" @bind="leasingTrailer" @bind:after="Recalc" /><span class="pu">₽</span></div>
+        <div class="prow"><span class="pl">Лизинг тягача</span><input type="number" class="inp" @bind="leasingTruck" @bind:after="Recalc" /><span class="pu">₽</span></div>
+    </div>
+}
+
+@code {
+    public class CalcRecord
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public DateTime Date { get; set; } = DateTime.Now;
+        public string Loading { get; set; } = "";
+        public string Unloading { get; set; } = "";
+        public string Mode { get; set; } = "Руб/Км";
+        public bool KmMode { get; set; } = true;
+        public double Km { get; set; }
+        public double RoundKm { get; set; }
+        public double CalcOn { get; set; }
+        public double Cost { get; set; }
+        public double ZeroKm { get; set; }
+        public double ZeroTon { get; set; }
+        public double Offer { get; set; }
+        public double Revenue { get; set; }
+        public double Profit { get; set; }
+        public double ProfitPct { get; set; }
+        public double Salary { get; set; }
+        public double Avtodor { get; set; }
+        public bool RoundTrip { get; set; }
+        public bool LeasingTruckOn { get; set; }
+        public bool LeasingTrailerOn { get; set; }
+        public string Detail { get; set; } = "";
+
+        public string DateStr => Date.ToString("dd.MM.yyyy HH:mm");
+        public string Route => Loading + " — " + Unloading;
+        public string CostStr => "Себестоимость: " + Cost.ToString("N0") + " ₽";
+        public string ProfitStr => "ОП: " + Profit.ToString("N0") + " ₽ (" + ProfitPct.ToString("N1") + "%)";
+    }
+
+    public static class CalcRepo
+    {
+        private static string DbPath => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "LogisticsWeb",
+            "logistics.db");
+
+        public static List<CalcRecord> Load()
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(DbPath)!);
+                using var conn = new SqliteConnection("Data Source=" + DbPath);
+                conn.Open();
+                EnsureTable(conn);
+
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "SELECT Value FROM AppState WHERE Key = 'calcs';";
+                var raw = cmd.ExecuteScalar()?.ToString();
+                if (string.IsNullOrWhiteSpace(raw)) return new List<CalcRecord>();
+
+                return JsonSerializer.Deserialize<List<CalcRecord>>(raw) ?? new List<CalcRecord>();
+            }
+            catch
+            {
+                return new List<CalcRecord>();
+            }
+        }
+
+        public static void Save(List<CalcRecord> items)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(DbPath)!);
+                using var conn = new SqliteConnection("Data Source=" + DbPath);
+                conn.Open();
+                EnsureTable(conn);
+
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText =
+                    "INSERT INTO AppState (Key, Value) VALUES ('calcs', $v) " +
+                    "ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value;";
+                cmd.Parameters.AddWithValue("$v", JsonSerializer.Serialize(items));
+                cmd.ExecuteNonQuery();
+            }
+            catch
+            {
+                // БД занята — интерфейс не роняем
+            }
+        }
+
+        private static void EnsureTable(SqliteConnection conn)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "CREATE TABLE IF NOT EXISTS AppState (Key TEXT PRIMARY KEY, Value TEXT NOT NULL);";
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    int tab;
+    string search = "";
+    string msg = "";
+    bool msgOk;
+    CalcRecord? selected;
+    List<CalcRecord> records = new();
+
+    string mode = "km";
+    bool kmMode => mode == "km";
+
+    double calcOn = 20;
+    double km;
+    double salary;
+    double avtodor;
+    double offerKm;
+    double offerTon;
+    bool roundTrip;
+    bool leasingTruckOn;
+    bool leasingTrailerOn;
+    string loading = "";
+    string unloading = "";
+
+    double fuelPrice = 55;
+    double repairNorm = 60000;
+    double platonPerKm = 3.5;
+    double admin = 15000;
+    double osago = 8000;
+    double kaskoTrailer = 8000;
+    double kaskoTruck = 25000;
+    double leasingTrailer = 40000;
+    double leasingTruck = 120000;
+
+    double roundKm;
+    double fuelNoNds;
+    double leasTruckTrip;
+    double leasTrailerTrip;
+    double osagoTrip;
+    double kaskoTruckTrip;
+    double kaskoTrailerTrip;
+    double platonTrip;
+    double amorTruck;
+    double amorTrailer;
+    double adminTrip;
+    double repairTrip;
+    double days;
+    double cost;
+    double zeroTon;
+    double zeroKm;
+    double revenue;
+    double profit;
+    double profitPct;
+
+    protected override void OnInitialized()
+    {
+        records = CalcRepo.Load();
+        Recalc();
+    }
+
+    string TabClass(int i) => tab == i ? "ctab on" : "ctab";
+    string ModeName() => kmMode ? "Руб/Км" : "Руб/Тонн";
+    string F(double v) => v.ToString("N2");
+    string MsgClass() => msgOk ? "msg ok" : "msg";
+    string ProfitClass() => profit >= 0 ? "res good" : "res bad";
+    string RecClass(CalcRecord r) => selected != null && selected.Id == r.Id ? "hitem on" : "hitem";
+    string OfferClass(bool forKm) => kmMode == forKm ? "inp act" : "inp";
+
+    List<CalcRecord> Filtered
+    {
+        get
+        {
+            var q = (search ?? "").Trim().ToLower();
+            if (q.Length == 0) return records;
+
+            return records.Where(r =>
+                (r.Loading + " " + r.Unloading).ToLower().Contains(q) ||
+                r.Mode.ToLower().Contains(q) ||
+                r.DateStr.Contains(q)).ToList();
+        }
+    }
+
+    void Recalc()
+    {
+        double c = calcOn <= 0 ? 20 : calcOn;
+
+        roundKm = roundTrip ? km * 2 : km;
+        fuelNoNds = 0.54 * roundKm * fuelPrice / 1.22;
+        days = km == 0 ? 0.42 : ((roundKm / 80) / 24) + 0.42;
+        leasTruckTrip = leasingTruckOn ? leasingTruck / 30.5 * days : 0;
+        leasTrailerTrip = leasingTrailerOn ? leasingTrailer / 30.5 * days : 0;
+        osagoTrip = osago / 30.5 * days;
+        kaskoTruckTrip = kaskoTruck / 30.5 * days;
+        kaskoTrailerTrip = kaskoTrailer / 30.5 * days;
+        platonTrip = roundKm * platonPerKm;
+        amorTruck = 10 * roundKm;
+        amorTrailer = amorTruck / 3;
+        adminTrip = admin;
+        repairTrip = repairNorm / 30.5;
+
+        cost = salary + fuelNoNds + leasTruckTrip + leasTrailerTrip + osagoTrip + kaskoTruckTrip
+             + kaskoTrailerTrip + platonTrip + amorTruck + amorTrailer + adminTrip + avtodor + repairTrip;
+
+        zeroTon = c == 0 ? 0 : cost / c;
+        zeroKm = roundKm == 0 ? 0 : cost / roundKm;
+
+        revenue = kmMode ? offerKm * roundKm : offerTon * c;
+        profit = revenue - cost;
+        profitPct = revenue == 0 ? 0 : (revenue - cost) / revenue * 100;
+    }
+
+    void SaveCalc()
+    {
+        Recalc();
+        msg = "";
+        msgOk = false;
+
+        if (string.IsNullOrWhiteSpace(loading) || string.IsNullOrWhiteSpace(unloading))
+        {
+            msg = "Заполните пункт загрузки и выгрузки";
+            return;
+        }
+
+        if (km <= 0)
+        {
+            msg = "Введите километраж";
+            return;
+        }
+
+        double offer = kmMode ? offerKm : offerTon;
+
+        var r = new CalcRecord
+        {
+            Date = DateTime.Now,
+            Loading = loading.Trim(),
+            Unloading = unloading.Trim(),
+            Mode = ModeName(),
+            KmMode = kmMode,
+            Km = km,
+            RoundKm = roundKm,
+            CalcOn = calcOn,
+            Cost = cost,
+            ZeroKm = zeroKm,
+            ZeroTon = zeroTon,
+            Offer = offer,
+            Revenue = revenue,
+            Profit = profit,
+            ProfitPct = profitPct,
+            Salary = salary,
+            Avtodor = avtodor,
+            RoundTrip = roundTrip,
+            LeasingTruckOn = leasingTruckOn,
+            LeasingTrailerOn = leasingTrailerOn,
+            Detail =
+                "Маршрут: " + loading.Trim() + " — " + unloading.Trim()
+                + "\nДата: " + DateTime.Now.ToString("dd.MM.yyyy HH:mm")
+                + "\nРежим: " + ModeName()
+                + "\nКилометраж: " + km.ToString("N2") + " км"
+                + "\nПробег на круг: " + roundKm.ToString("N2") + " км"
+                + "\nРасчёт на: " + calcOn.ToString("N2") + " т"
+                + "\nДней на рейс: " + days.ToString("N2")
+                + "\nЗарплата на рейс: " + salary.ToString("N0") + " ₽"
+                + "\nТопливо без НДС: " + fuelNoNds.ToString("N0") + " ₽"
+                + "\nЛизинг тягача: " + leasTruckTrip.ToString("N0") + " ₽"
+                + "\nЛизинг прицепа: " + leasTrailerTrip.ToString("N0") + " ₽"
+                + "\nОСАГО: " + osagoTrip.ToString("N0") + " ₽"
+                + "\nКАСКО тягача: " + kaskoTruckTrip.ToString("N0") + " ₽"
+                + "\nКАСКО прицепа: " + kaskoTrailerTrip.ToString("N0") + " ₽"
+                + "\nПлатон: " + platonTrip.ToString("N0") + " ₽"
+                + "\nАмортизация тягача: " + amorTruck.ToString("N0") + " ₽"
+                + "\nАмортизация прицепа: " + amorTrailer.ToString("N0") + " ₽"
+                + "\nАдминистративные: " + adminTrip.ToString("N0") + " ₽"
+                + "\nАвтодор: " + avtodor.ToString("N0") + " ₽"
+                + "\nНорма ремонтов: " + repairTrip.ToString("N0") + " ₽"
+                + "\nСебестоимость: " + cost.ToString("N0") + " ₽"
+                + "\nВыход в 0: " + zeroKm.ToString("N2") + " ₽/км, " + zeroTon.ToString("N2") + " ₽/т"
+                + "\nПредлагаемая ставка: " + offer.ToString("N2") + (kmMode ? " ₽/км" : " ₽/т")
+                + "\nВыручка: " + revenue.ToString("N0") + " ₽"
+                + "\nОП: " + profit.ToString("N0") + " ₽, " + profitPct.ToString("N2") + " %"
+        };
+
+        records.Insert(0, r);
+        selected = r;
+        CalcRepo.Save(records);
+
+        msg = "Расчёт сохранён";
+        msgOk = true;
+    }
+
+    void Select(CalcRecord r) => selected = r;
+
+    void OpenSelected()
+    {
+        if (selected == null)
+        {
+            msg = "Выберите расчёт в списке";
+            msgOk = false;
+            return;
+        }
+
+        loading = selected.Loading;
+        unloading = selected.Unloading;
+        km = selected.Km;
+        calcOn = selected.CalcOn;
+        salary = selected.Salary;
+        avtodor = selected.Avtodor;
+        roundTrip = selected.RoundTrip;
+        leasingTruckOn = selected.LeasingTruckOn;
+        leasingTrailerOn = selected.LeasingTrailerOn;
+
+        if (selected.KmMode)
+        {
+            mode = "km";
+            offerKm = selected.Offer;
+        }
+        else
+        {
+            mode = "ton";
+            offerTon = selected.Offer;
+        }
+
+        Recalc();
+        tab = 0;
+        msg = "Расчёт загружен в калькулятор: " + selected.Route;
+        msgOk = true;
+    }
+
+    void DeleteSelected()
+    {
+        if (selected == null)
+        {
+            msg = "Выберите расчёт в списке";
+            msgOk = false;
+            return;
+        }
+
+        records.Remove(selected);
+        selected = null;
+        CalcRepo.Save(records);
+    }
+}

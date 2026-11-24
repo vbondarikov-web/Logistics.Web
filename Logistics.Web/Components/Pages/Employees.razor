@@ -1,0 +1,361 @@
+﻿@page "/employees"
+@using Logistics.Web.Models
+
+<style>
+    .emp-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+
+    .emp-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: #ffffff;
+        margin: 0;
+    }
+
+    .emp-badge {
+        font-size: 12px;
+        color: #a7f3d0;
+        background: rgba(255,255,255,.08);
+        border: 1px solid rgba(255,255,255,.18);
+        padding: 3px 10px;
+        border-radius: 12px;
+    }
+
+    .emp-search {
+        margin-left: auto;
+        height: 34px;
+        width: 260px;
+        max-width: 100%;
+        border-radius: 9px;
+        border: 1px solid rgba(255,255,255,.22);
+        background: rgba(255,255,255,.10);
+        color: #ffffff;
+        padding: 0 12px;
+        font-size: 12.5px;
+        outline: none;
+    }
+
+        .emp-search::placeholder {
+            color: #94d8c8;
+        }
+
+        .emp-search:focus {
+            border-color: #00a884;
+            background: rgba(255,255,255,.16);
+        }
+
+    .emp-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 12px;
+        max-width: 1200px;
+    }
+
+    .emp-card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 14px 16px;
+        color: #0f172a;
+        box-shadow: 0 6px 20px rgba(0,0,0,.16);
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+        min-width: 0;
+    }
+
+        .emp-card.mine {
+            box-shadow: 0 0 0 2px #00a884, 0 6px 20px rgba(0,0,0,.16);
+        }
+
+    .emp-top {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .emp-ava {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #0f766e;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .emp-fio {
+        font-size: 14px;
+        font-weight: 800;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+    }
+
+    .emp-pos {
+        font-size: 11.5px;
+        color: #64748b;
+    }
+
+    .emp-line {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12px;
+        color: #334155;
+        min-width: 0;
+    }
+
+    .emp-ico {
+        width: 18px;
+        text-align: center;
+        flex-shrink: 0;
+    }
+
+    .emp-value {
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .emp-chip {
+        align-self: flex-start;
+        font-size: 10px;
+        font-weight: 700;
+        color: #047857;
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        border-radius: 8px;
+        padding: 2px 8px;
+    }
+
+    .emp-readonly {
+        font-size: 11px;
+        color: #94a3b8;
+        font-style: italic;
+    }
+
+    .emp-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 2px;
+    }
+
+    .emp-btn {
+        height: 30px;
+        padding: 0 12px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        background: #fff;
+        color: #334155;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+        .emp-btn:hover {
+            background: #f1f5f9;
+        }
+
+        .emp-btn.primary {
+            background: #00a884;
+            border-color: #00a884;
+            color: #fff;
+        }
+
+            .emp-btn.primary:hover {
+                background: #029474;
+            }
+
+    .emp-edit-lbl {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .4px;
+        color: #64748b;
+    }
+
+    .emp-edit-inp {
+        width: 100%;
+        height: 32px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #f8fafc;
+        padding: 0 10px;
+        font-size: 12.5px;
+        outline: none;
+        box-sizing: border-box;
+    }
+
+        .emp-edit-inp:focus {
+            border-color: #00a884;
+            background: #fff;
+        }
+
+    .emp-empty {
+        background: #fff;
+        border-radius: 12px;
+        padding: 26px;
+        text-align: center;
+        color: #94a3b8;
+        font-size: 13px;
+        max-width: 1200px;
+    }
+</style>
+
+<div class="emp-head">
+    <h2 class="emp-title">Сотрудники</h2>
+    <span class="emp-badge">Всего: @EmployeeStore.Employees.Count</span>
+    <input class="emp-search"
+           placeholder="Поиск по ФИО, должности, email..."
+           @bind="search" @bind:event="oninput" />
+</div>
+
+@if (Visible.Count == 0)
+{
+    <div class="emp-empty">Сотрудников нет</div>
+}
+else
+{
+    <div class="emp-grid">
+        @foreach (var e in Visible)
+        {
+            <div class="emp-card @(IsMine(e) ? "mine" : "")">
+
+                @if (editLogin == e.Login)
+                {
+                    <div class="emp-top">
+                        <div class="emp-ava">@e.Initials</div>
+                        <div>
+                            <div class="emp-fio">Редактирование</div>
+                            <div class="emp-pos">@e.FullName</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="emp-edit-lbl">ФИО</div>
+                        <input class="emp-edit-inp" @bind="editFio" />
+                    </div>
+
+                    <div>
+                        <div class="emp-edit-lbl">Должность</div>
+                        <input class="emp-edit-inp" @bind="editPosition" />
+                    </div>
+
+                    <div>
+                        <div class="emp-edit-lbl">Телефон</div>
+                        <input class="emp-edit-inp" @bind="editPhone" />
+                    </div>
+
+                    <div>
+                        <div class="emp-edit-lbl">Email</div>
+                        <input class="emp-edit-inp" @bind="editEmail" />
+                    </div>
+
+                    <div class="emp-actions">
+                        <button class="emp-btn primary" @onclick="SaveEdit">Сохранить</button>
+                        <button class="emp-btn" @onclick="CancelEdit">Отмена</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="emp-top">
+                        <div class="emp-ava">@e.Initials</div>
+                        <div>
+                            <div class="emp-fio">@e.FullName</div>
+                            <div class="emp-pos">@e.Position</div>
+                        </div>
+                    </div>
+
+                    <div class="emp-line">
+                        <span class="emp-ico">📞</span>
+                        <span class="emp-value">@(string.IsNullOrWhiteSpace(e.Phone) ? "—" : e.Phone)</span>
+                    </div>
+
+                    <div class="emp-line">
+                        <span class="emp-ico">✉️</span>
+                        <span class="emp-value">@(string.IsNullOrWhiteSpace(e.Email) ? "—" : e.Email)</span>
+                    </div>
+
+                    @if (IsMine(e))
+                    {
+                        <span class="emp-chip">Это ваша карточка</span>
+                        <div class="emp-actions">
+                            <button class="emp-btn primary" @onclick="() => BeginEdit(e)">Редактировать</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="emp-readonly">Только просмотр</div>
+                    }
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    string search = "";
+    string editLogin = "";
+    string editFio = "";
+    string editPosition = "";
+    string editPhone = "";
+    string editEmail = "";
+
+    bool IsMine(Employee e)
+    {
+        var me = AuthStore.Current;
+        return me != null && string.Equals(e.Login, me.Login, StringComparison.OrdinalIgnoreCase);
+    }
+
+    List<Employee> Visible
+    {
+        get
+        {
+            var q = (search ?? "").Trim();
+
+            return EmployeeStore.Employees
+                .Where(e => q.Length == 0
+                    || (e.FullName ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
+                    || (e.Position ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
+                    || (e.Email ?? "").Contains(q, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(e => IsMine(e))
+                .ThenBy(e => e.FullName)
+                .ToList();
+        }
+    }
+
+    void BeginEdit(Employee e)
+    {
+        if (!IsMine(e)) return;
+
+        editLogin = e.Login;
+        editFio = e.FullName;
+        editPosition = e.Position;
+        editPhone = e.Phone;
+        editEmail = e.Email;
+    }
+
+    void CancelEdit() => editLogin = "";
+
+    void SaveEdit()
+    {
+        var e = EmployeeStore.Employees.FirstOrDefault(x => x.Login == editLogin);
+        if (e == null || !IsMine(e)) { editLogin = ""; return; }
+
+        e.FullName = (editFio ?? "").Trim();
+        e.Position = (editPosition ?? "").Trim();
+        e.Phone = (editPhone ?? "").Trim();
+        e.Email = (editEmail ?? "").Trim();
+
+        NotificationStore.Add("Сотрудники", "Карточка обновлена", e.FullName);
+        SqliteStore.SaveAll();
+        editLogin = "";
+    }
+}
