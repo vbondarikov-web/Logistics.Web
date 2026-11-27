@@ -14,9 +14,13 @@ namespace Logistics.Web.Models
         private static string ConnectionString => $"Data Source={DbPath}";
         private static bool _isLoaded = false;
 
+        private const string AtiNotificationsKey = "AtiNotifications";
+
         public static void Initialize() => Init();
 
         public static void Init()
+
+
         {
             if (_isLoaded) return;
 
@@ -67,6 +71,8 @@ namespace Logistics.Web.Models
                 LoadCollection(connection, "Employees", EmployeeStore.Employees);
                 LoadCollection(connection, "Dialogs", ChatStore.Dialogs);
                 LoadCollection(connection, "Notifications", NotificationStore.Items);
+                LoadAtiNotifications(connection); // ← добавь эту строку
+
             }
 
             TaskStore.Tasks.CollectionChanged += (s, e) => SaveAll();
@@ -100,6 +106,34 @@ namespace Logistics.Web.Models
                     }
                 }
             }
+        }
+
+        private static void LoadAtiNotifications(SqliteConnection connection)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT JsonData FROM AppState WHERE Key = @key;";
+            cmd.Parameters.AddWithValue("@key", AtiNotificationsKey);
+
+            if (cmd.ExecuteScalar() is not string json || string.IsNullOrWhiteSpace(json))
+                return;
+
+            try
+            {
+                var items = JsonSerializer.Deserialize<List<AtiNotification>>(json);
+                if (items != null)
+                    AtiInbox.Restore(items);
+            }
+            catch (JsonException ex)
+            {
+                Console.Error.WriteLine("[ATI] Не удалось загрузить уведомления: " + ex.Message);
+            }
+        }
+
+        internal static void SaveAtiNotifications(IEnumerable<AtiNotification> items)
+        {
+            using var connection = new SqliteConnection(ConnectionString);
+            connection.Open();
+            SaveCollection(connection, AtiNotificationsKey, items);
         }
 
         public static void SaveAll()

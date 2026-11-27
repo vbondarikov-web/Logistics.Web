@@ -5,6 +5,29 @@
 @inject AtiService Svc
 
 <style>
+    .ati-sec .atw-row,
+    .ati-sec ~ .atw-row {
+        max-width: 100%;
+    }
+
+    .ati-vehicle-wrap,
+    .ati-cargo-machine {
+        max-width: 100%;
+        overflow: hidden;
+    }
+
+    .ati-sec {
+        max-width: 760px;
+    }
+
+    .atw-row {
+        max-width: 760px;
+    }
+
+    .atw-tags {
+        max-width: 760px;
+    }
+
     .ati-tabs {
         margin: 14px 0;
         display: flex;
@@ -46,6 +69,11 @@
             background: rgba(239,68,68,.15);
             border-color: rgba(239,68,68,.45);
             color: #fecaca;
+        }
+
+        .ati-msg a {
+            color: #34d399;
+            margin-left: 8px;
         }
 
     .ati-card {
@@ -113,6 +141,17 @@
             cursor: not-allowed;
         }
 
+    .ati-actions select {
+        margin: 8px 8px 0 0;
+        padding: 5px 8px;
+        border: 1px solid rgba(255,255,255,.2);
+        border-radius: 6px;
+        background: #0f2a30;
+        color: #e6f1f0;
+        color-scheme: dark;
+        font: inherit;
+    }
+
     .ati-actions .ati-muted {
         margin-right: 8px;
     }
@@ -138,6 +177,20 @@
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
         gap: 12px;
+    }
+
+    .atibox-title {
+        color: inherit;
+    }
+
+    .atibox-all {
+        color: inherit;
+        opacity: .7;
+    }
+
+    .atibox-locked .atibox-title {
+        color: inherit;
+        opacity: .55;
     }
 
     .ati-field label {
@@ -238,6 +291,36 @@
             cursor: not-allowed;
         }
 
+    .ati-checks {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        margin-top: 4px;
+    }
+
+        .ati-checks label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            color: #e6f1f0;
+            font-size: .9em;
+        }
+
+        .ati-checks input {
+            width: 16px;
+            height: 16px;
+            accent-color: #10b981;
+        }
+
+    .ati-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        border: 1px solid rgba(255,255,255,.3);
+    }
+
     .ati-raw {
         max-width: 1000px;
         background: #071518;
@@ -279,11 +362,22 @@ else
         <button class="@(tab == "list" ? "on" : "")" @onclick='() => tab = "list"'>Мои грузы (@loads.Count)</button>
         <button class="@(tab == "form" ? "on" : "")" @onclick='() => tab = "form"'>@(editId != null ? "Редактирование" : "Выставить груз")</button>
         <button class="@(tab == "other" ? "on" : "")" @onclick='() => tab = "other"'>Площадки и предложения</button>
+        <button class="@(tab == "archive" ? "on" : "")" @onclick='() => tab = "archive"'>Архив@(archiveLoaded ? " (" + archived.Count + ")" : "")</button>
+        <button type="button" class="@(tab == "orders" ? "on" : "")"
+                @onclick='() => { tab = "orders"; }'>
+            Заказы
+        </button>
     </div>
 
     @if (msg.Length > 0)
     {
-        <div class="ati-msg @(msgError ? "err" : "")">@msg</div>
+        <div class="ati-msg @(msgError ? "err" : "")">
+            @msg
+            @if (docUrl.Length > 0)
+            {
+                <a href="@docUrl" target="_blank">Открыть документ</a>
+            }
+        </div>
     }
 
     @if (tab == "list")
@@ -295,12 +389,30 @@ else
             </button>
         </div>
 
+        <div class="ati-actions">
+            <label for="ati-contact-filter">Контакт в объявлении</label>
+            <select id="ati-contact-filter" @bind="loadContactFilter">
+                <option value="">Все контакты</option>
+                @foreach (var contactId in loads.Select(l => l.ContactId)
+                                               .Distinct()
+                                               .OrderBy(id => LoadContactName(id)))
+                {
+                    <option value="@contactId">@LoadContactName(contactId)</option>
+                }
+            </select>
+        </div>
+
+        @if (loads.Count > 0 && !FilteredLoads.Any())
+        {
+            <p class="ati-muted">По выбранному контакту грузов нет.</p>
+        }
+
         @if (loads.Count == 0)
         {
             <p class="ati-muted">Опубликованных грузов нет.</p>
         }
 
-        @foreach (var l in loads)
+        @foreach (var l in FilteredLoads)
         {
             <div class="ati-card">
                 <div>
@@ -335,6 +447,9 @@ else
                     </div>
                     <div><span class="ati-rate">@RateText(l)</span> · @DateText(l)</div>
                     <div class="ati-muted">
+                        Контакт в объявлении: @LoadContactName(l.ContactId)
+                    </div>
+                    <div class="ati-muted">
                         № @l.Number
                         @if (l.AddedAt != null)
                         {
@@ -348,6 +463,10 @@ else
                     @if (l.Note.Length > 0)
                     {
                         <div class="ati-muted">@l.Note</div>
+                    }
+                    @if (l.BoardIds.Count > 0)
+                    {
+                        <div class="ati-muted">Площадки: @Svc.BoardNames(l.BoardIds)</div>
                     }
                     @if (!l.CanBeRenewed && l.RenewRestriction.Length > 0)
                     {
@@ -366,11 +485,114 @@ else
                         }
                         else
                         {
+                            <button type="button"
+                                    disabled="@(busy || !l.CanBeRenewed)"
+                                    title="@(!l.CanBeRenewed ? l.RenewRestriction : "Поднять груз в ТОП")"
+                                    @onclick="() => Run(() => RefreshOne(l))">
+                                Поднять в ТОП
+                            </button>
                             <button disabled="@(busy || !l.CanBeEdited)" @onclick="() => Run(() => OpenDraft(l, true))">Редактировать</button>
                             <button disabled="@busy" @onclick="() => Run(() => OpenDraft(l, false))">Копировать</button>
-                            <button disabled title="Нужна документация ATI по поиску транспорта">Найти машину</button>
+                            <button disabled="@busy" @onclick="() => Run(() => FindTrucks(l))">
+                                Найти машину
+                            </button>
                             <button disabled="@busy" @onclick="() => confirmArchiveId = l.Id">В архив</button>
+                            <select @bind="docType">
+                                @foreach (var t in DocTypes)
+                                {
+                                    <option value="@t">@t</option>
+                                }
+                            </select>
+                            <button disabled="@busy" @onclick="() => Run(() => CreateAtiDoc(l))">Создать документ</button>
                         }
+
+                        @if (truckCargoId == l.Id)
+                        {
+                            <div class="ati-sec" style="margin-top:12px">
+                                <h4>Поиск транспорта</h4>
+
+                                <label>
+                                    <input type="checkbox" @bind="truckDemo" disabled="@(busy || Svc.IsDryRun)" />
+                                    Демо ATI
+                                </label>
+                                <button class="ati-btn" disabled="@busy" @onclick="() => Run(() => FindTrucks(l))">
+                                    Повторить поиск
+                                </button>
+                                <button class="ati-btn" disabled="@busy" @onclick="() => truckCargoId = null">
+                                    Закрыть
+                                </button>
+
+                                @if (truckSearchCompleted)
+                                {
+                                    @if (truckLastSearchWasDemo)
+                                    {
+                                        <p class="ati-muted">Демо-выдача: не используйте её для заказа машины.</p>
+                                    }
+
+                                    <p class="ati-muted">
+                                        Найдено: @truckTotal · скрыто ATI: @truckHidden · показано: @truckItems.Count
+                                    </p>
+
+                                    @if (truckItems.Count == 0)
+                                    {
+                                        <p class="ati-muted">Нет доступных для показа машин по этому запросу.</p>
+                                    }
+
+                                    @foreach (var t in truckItems)
+                                    {
+                                        <div class="ati-card">
+                                            <div class="main">
+                                                <div class="ati-route">
+                                                    @(string.IsNullOrWhiteSpace(t.FirmName) ? "Перевозчик" : t.FirmName)
+                                                    @if (t.AtiId.Length > 0)
+                                                    {
+                                                        <span class="ati-muted"> · АТИ @t.AtiId</span>
+                                                    }
+                                                </div>
+                                                <div>
+                                                    Откуда: @Svc.CityName(t.LoadingCityId)
+                                                    @if (t.Weight > 0)
+                                                    {
+                                                        <span> · до @t.Weight.ToString("0.###") т</span>
+                                                    }
+                                                    @if (t.Volume > 0)
+                                                    {
+                                                        <span> · @t.Volume.ToString("0.###") м³</span>
+                                                    }
+                                                    @if (Svc.BodyNames(t.CarType).Length > 0)
+                                                    {
+                                                        <span> · @Svc.BodyNames(t.CarType)</span>
+                                                    }
+                                                </div>
+                                                @if (t.FirstDate is DateTime first)
+                                                {
+                                                    <div class="ati-muted">
+                                                        Доступна с @first.ToString("dd.MM.yyyy")
+                                                        @if (t.LastDate is DateTime last && last != first)
+                                                        {
+                                                            <span> до @last.ToString("dd.MM.yyyy")</span>
+                                                        }
+                                                    </div>
+                                                }
+                                                @if (t.Note.Length > 0)
+                                                {
+                                                    <div>@t.Note</div>
+                                                }
+                                                @if (t.Contacts.Count == 0)
+                                                {
+                                                    <div class="ati-muted">Контакты по объявлению не получены.</div>
+                                                }
+                                                @foreach (var contact in t.Contacts)
+                                                {
+                                                    <div>@contact</div>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        }
+
                     </div>
                 </div>
             </div>
@@ -391,8 +613,13 @@ else
             <h4>Загрузка</h4>
             <div class="ati-grid">
                 <div class="ati-field ati-city">
-                    <label>Город</label>
-                    <input value="@loadQuery" placeholder="Начните вводить" autocomplete="off" @oninput="e => SearchCity(true, e.Value?.ToString())" />
+                    <label for="ati-loading-city">Город загрузки</label>
+                    <input id="ati-loading-city"
+                           value="@loadQuery"
+                           placeholder="Начните вводить город"
+                           autocomplete="off"
+                           @oninput="e => SearchCity(true, e.Value?.ToString())" />
+
                     @if (loadSug.Count > 0)
                     {
                         <div class="ati-sug">
@@ -403,8 +630,16 @@ else
                         </div>
                     }
                 </div>
-                <div class="ati-field"><label>Адрес</label><input @bind="draft.LoadingAddress" /></div>
-                <div class="ati-field"><label>Дата</label><input type="date" @bind="draft.LoadingDate" /></div>
+
+                <div class="ati-field">
+                    <label for="ati-loading-address">Адрес загрузки</label>
+                    <input id="ati-loading-address" @bind="draft.LoadingAddress" />
+                </div>
+
+                <div class="ati-field">
+                    <label for="ati-loading-date">Дата загрузки</label>
+                    <input id="ati-loading-date" type="date" @bind="draft.LoadingDate" />
+                </div>
             </div>
         </div>
 
@@ -412,8 +647,13 @@ else
             <h4>Разгрузка</h4>
             <div class="ati-grid">
                 <div class="ati-field ati-city">
-                    <label>Город</label>
-                    <input value="@unloadQuery" placeholder="Начните вводить" autocomplete="off" @oninput="e => SearchCity(false, e.Value?.ToString())" />
+                    <label for="ati-unloading-city">Город выгрузки</label>
+                    <input id="ati-unloading-city"
+                           value="@unloadQuery"
+                           placeholder="Начните вводить город"
+                           autocomplete="off"
+                           @oninput="e => SearchCity(false, e.Value?.ToString())" />
+
                     @if (unloadSug.Count > 0)
                     {
                         <div class="ati-sug">
@@ -424,38 +664,380 @@ else
                         </div>
                     }
                 </div>
-                <div class="ati-field"><label>Адрес</label><input @bind="draft.UnloadingAddress" /></div>
+
+                <div class="ati-field">
+                    <label for="ati-unloading-address">Адрес выгрузки</label>
+                    <input id="ati-unloading-address" @bind="draft.UnloadingAddress" />
+                </div>
             </div>
         </div>
 
         <div class="ati-sec">
             <h4>Груз и машина</h4>
+
             <div class="ati-grid">
-                <div class="ati-field"><label>Груз</label><input @bind="draft.CargoName" /></div>
-                <div class="ati-field"><label>Вес, т</label><input type="number" step="any" @bind="draft.Weight" /></div>
-                <div class="ati-field"><label>Объём, м³</label><input type="number" step="any" @bind="draft.Volume" /></div>
                 <div class="ati-field">
-                    <label>Кузов</label>
-                    <select @bind="draft.BodyTypeId">
-                        <option value="0">— выберите —</option>
-                        @foreach (var t in carTypes)
+                    <label for="ati-cargo-name">Груз</label>
+                    <input id="ati-cargo-name" type="text" list="ati-cargo-names"
+                           placeholder="Начни вводить наименование"
+                           @bind="draft.CargoName" />
+                    <datalist id="ati-cargo-names">
+                        @foreach (var cargoName in cargoNames)
                         {
-                            <option value="@Svc.BodyValue(t)">@t.Name</option>
+                            <option value="@cargoName"></option>
                         }
-                    </select>
+                    </datalist>
                 </div>
-                <div class="ati-field"><label>Машин</label><input type="number" min="1" @bind="draft.TrucksCount" /></div>
+
                 <div class="ati-field">
-                    <label>Загрузка</label>
-                    <select @bind="draft.LoadType">
+                    <label>Вес, т</label>
+                    <input type="number" step="any" @bind="draft.Weight" />
+                </div>
+
+                <div class="ati-field">
+                    <label>Объём, м³</label>
+                    <input type="number" step="any" @bind="draft.Volume" />
+                </div>
+
+                <div class="ati-field">
+                    <label>Машин</label>
+                    <input type="number" min="1" @bind="draft.TrucksCount" />
+                </div>
+
+                <div class="ati-field">
+                    <label for="ati-load-type">Тип перевозки</label>
+                    <select id="ati-load-type" @bind="draft.LoadType">
                         <option value="ftl">Отдельной машиной</option>
                         <option value="ltl">Догрузом</option>
                         <option value="dont-care">Не важно</option>
                     </select>
                 </div>
-                <div class="ati-field"><label>Грузоподъёмность, т</label><input type="number" step="any" @bind="draft.RequiredCapacity" /></div>
+
+                <div class="ati-field">
+                    <label>Грузоподъёмность, т</label>
+                    <input type="number" step="any" @bind="draft.RequiredCapacity" />
+                </div>
             </div>
+
+            <style>
+                    .atw-row {
+                        display: grid;
+                        grid-template-columns: repeat(3, minmax(0, 1fr));
+                        gap: 10px;
+                        max-width: 100%;
+                        margin: 12px 0 0;
+                    }
+
+                    .atw {
+                        display: flex;
+                        flex-direction: column;
+                        min-width: 0;
+                        border: 1px solid #2f5d63;
+                        border-radius: 12px;
+                        background: #0f2a30;
+                        overflow: hidden;
+                    }
+
+                        .atw:focus-within {
+                            border-color: #2dd4a3;
+                        }
+
+                    .atw-head {
+                        display: flex;
+                        align-items: center;
+                        flex-wrap: wrap;
+                        gap: 4px 8px;
+                        padding: 8px 10px;
+                        border-bottom: 1px solid #25494f;
+                        background: #143a41;
+                    }
+
+                        .atw-head strong {
+                            font-size: 12px;
+                            font-weight: 600;
+                            color: #e6f4f1;
+                        }
+
+                    .atw-count {
+                        padding: 0 7px;
+                        border-radius: 999px;
+                        background: #2dd4a3;
+                        color: #06241d;
+                        font-size: 11px;
+                        font-weight: 700;
+                    }
+
+                    .atw-head .atw-all {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 4px;
+                        margin: 0 0 0 auto;
+                        font-size: 10px;
+                        font-weight: 400;
+                        color: #9fc4c0;
+                        white-space: nowrap;
+                        cursor: pointer;
+                    }
+
+                    .atw-head input[type="checkbox"] {
+                        width: 13px;
+                        height: 13px;
+                        margin: 0;
+                        accent-color: #2dd4a3;
+                    }
+
+                    .atw-search-wrap {
+                        position: relative;
+                        padding: 8px 8px 0;
+                    }
+
+                    .atw-search {
+                        box-sizing: border-box;
+                        width: 100%;
+                        height: 28px;
+                        margin: 0;
+                        padding: 0 26px 0 9px;
+                        border: 1px solid #2f5d63;
+                        border-radius: 8px;
+                        background: #0a1f24;
+                        color: #e6f4f1;
+                        font-size: 12px;
+                        outline: none;
+                    }
+
+                        .atw-search:focus {
+                            border-color: #2dd4a3;
+                        }
+
+                    .atw-search-icon {
+                        position: absolute;
+                        top: 14px;
+                        right: 16px;
+                        color: #6f9a98;
+                        font-size: 13px;
+                        pointer-events: none;
+                    }
+
+                    .atw-list {
+                        height: 180px;
+                        overflow-y: auto;
+                        padding: 6px;
+                    }
+
+                        .atw-list::-webkit-scrollbar {
+                            width: 6px;
+                        }
+
+                        .atw-list::-webkit-scrollbar-thumb {
+                            background: #2f5d63;
+                            border-radius: 999px;
+                        }
+
+                    .atw-item {
+                        display: flex;
+                        align-items: center;
+                        gap: 7px;
+                        width: auto;
+                        min-height: 26px;
+                        margin: 0;
+                        padding: 0 6px;
+                        border-radius: 6px;
+                        color: #d3e8e5;
+                        font-size: 12px;
+                        font-weight: 400;
+                        cursor: pointer;
+                        user-select: none;
+                    }
+
+                        .atw-item:hover {
+                            background: #17424a;
+                        }
+
+                        .atw-item input[type="checkbox"] {
+                            flex: 0 0 auto;
+                            width: 14px;
+                            height: 14px;
+                            margin: 0;
+                            accent-color: #2dd4a3;
+                        }
+
+                    .atw-empty {
+                        margin: 8px 6px;
+                        color: #6f9a98;
+                        font-size: 12px;
+                    }
+
+                    .atw-locked {
+                        opacity: .5;
+                        pointer-events: none;
+                    }
+
+                    .atw-tags {
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 5px;
+                        padding: 8px 0 0;
+                    }
+
+                    .atw-tag {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 4px;
+                        padding: 2px 9px;
+                        border-radius: 999px;
+                        background: #17424a;
+                        color: #bff3e4;
+                        font-size: 11px;
+                    }
+
+                        .atw-tag button {
+                            padding: 0;
+                            border: 0;
+                            background: transparent;
+                            color: #2dd4a3;
+                            font-size: 13px;
+                            line-height: 1;
+                            cursor: pointer;
+                        }
+
+                    @@media (max-width: 900px) {
+                        .atw-row {
+                            grid-template-columns: 1fr;
+                        }
+                    }
+            </style>
+
+            <div class="atw-row">
+
+                <div class="atw">
+                    <div class="atw-head">
+                        <strong>Кузов</strong>
+                        <span class="atw-count">@draft.BodyTypeIds.Count</span>
+                    </div>
+
+                    <div class="atw-search-wrap">
+                        <input type="text" class="atw-search" placeholder="Поиск"
+                               @bind="bodyBoxSearch" @bind:event="oninput" />
+                        <span class="atw-search-icon">⌕</span>
+                    </div>
+
+                    <div class="atw-list">
+                        @foreach (var atwBody in atwBodies)
+                        {
+                            var atwBodyId = Svc.BodyValue(atwBody);
+
+                            <label class="atw-item" @key="atwBodyId">
+                                <input type="checkbox"
+                                       checked="@draft.BodyTypeIds.Contains(atwBodyId)"
+                                       @onchange="e => ToggleBodyType(atwBodyId, e.Value is true)" />
+                                <span>@atwBody.Name</span>
+                            </label>
+                        }
+
+                        @if (atwBodies.Count == 0)
+                        {
+                            <div class="atw-empty">Кузова не найдены</div>
+                        }
+                    </div>
+                </div>
+
+                <div class="atw @(atwLocked ? "atw-locked" : "")">
+                    <div class="atw-head">
+                        <strong>Загрузка</strong>
+                        <span class="atw-count">@draft.BodyLoadingTypeIds.Count</span>
+
+                        <label class="atw-all">
+                            <input type="checkbox"
+                                   checked="@draft.IsAllBodyLoadingRequired"
+                                   disabled="@(draft.BodyLoadingTypeIds.Count == 0)"
+                                   @onchange="e => draft.IsAllBodyLoadingRequired = e.Value is true" />
+                            <span>все выбранные</span>
+                        </label>
+                    </div>
+
+                    <div class="atw-search-wrap">
+                        <input type="text" class="atw-search" placeholder="Поиск"
+                               @bind="loadBoxSearch" @bind:event="oninput" />
+                        <span class="atw-search-icon">⌕</span>
+                    </div>
+
+                    <div class="atw-list">
+                        @foreach (var atwOpt in atwLoad)
+                        {
+                            <label class="atw-item" @key="atwOpt.Id">
+                                <input type="checkbox"
+                                       checked="@draft.BodyLoadingTypeIds.Contains(atwOpt.Id)"
+                                       @onchange="e => SetHandlingMethod(draft.BodyLoadingTypeIds, atwOpt.Id, e.Value is true)" />
+                                <span>@atwOpt.Name</span>
+                            </label>
+                        }
+
+                        @if (atwLoad.Count == 0)
+                        {
+                            <div class="atw-empty">@(handlingOptions.Count == 0 ? "Справочник не загружен" : "Ничего не найдено")</div>
+                        }
+                    </div>
+                </div>
+
+                <div class="atw @(atwLocked ? "atw-locked" : "")">
+                    <div class="atw-head">
+                        <strong>Выгрузка</strong>
+                        <span class="atw-count">@draft.BodyUnloadingTypeIds.Count</span>
+
+                        <label class="atw-all">
+                            <input type="checkbox"
+                                   checked="@draft.IsAllBodyUnloadingRequired"
+                                   disabled="@(draft.BodyUnloadingTypeIds.Count == 0)"
+                                   @onchange="e => draft.IsAllBodyUnloadingRequired = e.Value is true" />
+                            <span>все выбранные</span>
+                        </label>
+                    </div>
+
+                    <div class="atw-search-wrap">
+                        <input type="text" class="atw-search" placeholder="Поиск"
+                               @bind="unloadBoxSearch" @bind:event="oninput" />
+                        <span class="atw-search-icon">⌕</span>
+                    </div>
+
+                    <div class="atw-list">
+                        @foreach (var atwOpt in atwUnload)
+                        {
+                            <label class="atw-item" @key="atwOpt.Id">
+                                <input type="checkbox"
+                                       checked="@draft.BodyUnloadingTypeIds.Contains(atwOpt.Id)"
+                                       @onchange="e => SetHandlingMethod(draft.BodyUnloadingTypeIds, atwOpt.Id, e.Value is true)" />
+                                <span>@atwOpt.Name</span>
+                            </label>
+                        }
+
+                        @if (atwUnload.Count == 0)
+                        {
+                            <div class="atw-empty">@(handlingOptions.Count == 0 ? "Справочник не загружен" : "Ничего не найдено")</div>
+                        }
+                    </div>
+                </div>
+
+            </div>
+
+            @if (draft.BodyTypeIds.Count > 0)
+            {
+                <div class="atw-tags">
+                    @foreach (var atwBody in atwBodies.Where(b => draft.BodyTypeIds.Contains(Svc.BodyValue(b))))
+                    {
+                        var atwTagId = Svc.BodyValue(atwBody);
+
+                        <span class="atw-tag">
+                            @atwBody.Name
+                            <button type="button" title="Убрать"
+                                    @onclick="() => ToggleBodyType(atwTagId, false)">
+                                ×
+                            </button>
+                        </span>
+                    }
+                </div>
+            }
         </div>
+
 
         <div class="ati-sec">
             <h4>Оплата</h4>
@@ -490,7 +1072,47 @@ else
                         }
                     </select>
                 </div>
-                <div class="ati-field"><label>ID площадки</label><input placeholder="пусто — общая" @bind="draft.BoardId" /></div>
+                <div class="ati-field">
+                    <label>Публикация</label>
+                    <select @bind="draft.PublicationMode">
+                        <option value="now">Сразу</option>
+                        <option value="15m">Через 15 минут</option>
+                        <option value="30m">Через 30 минут</option>
+                        <option value="1h">Через час</option>
+                        <option value="3h">Через 3 часа</option>
+                        <option value="6h">Через 6 часов</option>
+                    </select>
+                </div>
+                <div class="ati-field wide">
+                    <label>Площадки</label>
+                    <div class="ati-checks">
+                        <label>
+                            <input type="checkbox" checked="@draft.BoardIds.Contains(AtiBoards.CommonId)"
+                                   @onchange="e => ToggleDraftBoard(AtiBoards.CommonId, e.Value is true)" />
+                            @AtiBoards.CommonName
+                        </label>
+                        @foreach (var b in boards.Where(x => x.CanAdd))
+                        {
+                            <label>
+                                <input type="checkbox" checked="@draft.BoardIds.Contains(b.Id)"
+                                       @onchange="e => ToggleDraftBoard(b.Id, e.Value is true)" />
+                                @if (b.Color.Length > 0)
+                                {
+                                    <span class="ati-dot" style="background:@b.Color"></span>
+                                }
+                                @b.Name
+                                @if (b.IsOwner)
+                                {
+                                    <span class="ati-muted">(моя)</span>
+                                }
+                            </label>
+                        }
+                    </div>
+                    @if (boardsError.Length > 0)
+                    {
+                        <div class="ati-muted" style="color:#fca5a5">Список площадок не загружен: @boardsError</div>
+                    }
+                </div>
                 <div class="ati-field wide"><label>Примечание</label><textarea rows="2" @bind="draft.Note"></textarea></div>
             </div>
         </div>
@@ -507,6 +1129,27 @@ else
         <div>
             <button class="ati-btn primary" disabled="@busy" @onclick="() => Run(LoadCounterOffers)">Встречные предложения</button>
             <button class="ati-btn" disabled="@busy" @onclick="() => Run(LoadCounterOffersRaw)">Предложения (JSON)</button>
+        </div>
+
+        <div class="ati-sec">
+            <h4>Входящие приглашения</h4>
+
+            <button type="button" class="ati-btn" disabled="@busy"
+                    @onclick="() => Run(LoadIncomingInvites)">
+                Обновить приглашения
+            </button>
+
+            @if (incomingInvitesEmpty)
+            {
+                <p class="ati-muted">Нет входящих приглашений.</p>
+            }
+            else if (incomingInvitesJson.Length > 0)
+            {
+                <details>
+                    <summary>Ответ ATI.SU (JSON)</summary>
+                    <pre class="ati-raw">@incomingInvitesJson</pre>
+                </details>
+            }
         </div>
 
         @if (offersLoaded && offers.Count == 0)
@@ -578,10 +1221,41 @@ else
 
         <div class="ati-sec" style="margin-top:18px">
             <h4>Поиск по площадкам</h4>
-            <div class="ati-field">
-                <label>ID площадок через запятую (пусто — все закрытые площадки)</label>
-                <input @bind="boardIdsText" />
-            </div>
+            @if (boards.Any(x => x.CanView))
+            {
+                <div class="ati-field">
+                    <label>Площадки (ничего не отмечено — все закрытые площадки)</label>
+                    <div class="ati-checks">
+                        @foreach (var b in boards.Where(x => x.CanView))
+                        {
+                            <label>
+                                <input type="checkbox" checked="@boardSearchSel.Contains(b.Id)"
+                                       @onchange="e => ToggleSearchBoard(b.Id, e.Value is true)" />
+                                @if (b.Color.Length > 0)
+                                {
+                                    <span class="ati-dot" style="background:@b.Color"></span>
+                                }
+                                @b.Name
+                                @if (b.ContentCount > 0)
+                                {
+                                    <span class="ati-muted">(@b.ContentCount)</span>
+                                }
+                            </label>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="ati-field">
+                    <label>ID площадок через запятую (пусто — все закрытые площадки)</label>
+                    <input @bind="boardIdsText" />
+                </div>
+                @if (boardsError.Length > 0)
+                {
+                    <div class="ati-muted" style="color:#fca5a5">Список площадок не загружен: @boardsError</div>
+                }
+            }
             <button class="ati-btn primary" style="margin-top:10px" disabled="@busy" @onclick="() => Run(SearchBoards)">Искать</button>
             <button class="ati-btn" style="margin-top:10px" disabled="@busy" @onclick="() => Run(SearchBoardsRaw)">Результат (JSON)</button>
         </div>
@@ -644,29 +1318,103 @@ else
 
                     @if (offerCargoId == bc.Id)
                     {
-                        <div class="ati-grid" style="margin-top:10px">
+                        <fieldset class="ati-grid" style="margin:10px 0 0; padding:0; border:0"
+          disabled="@(busy || confirmSendOfferId == bc.Id)">
                             <div class="ati-field"><label>Ставка с НДС</label><input type="number" step="any" @bind="offerDraft.NdsPrice" /></div>
+                            <div class="ati-field"><label>НДС, %</label><input type="number" min="1" max="99" @bind="offerDraft.NdsPercent" /></div>
                             <div class="ati-field"><label>Ставка без НДС</label><input type="number" step="any" @bind="offerDraft.NotNdsPrice" /></div>
                             <div class="ati-field"><label>Наличными</label><input type="number" step="any" @bind="offerDraft.Price" /></div>
                             <div class="ati-field"><label>Дата загрузки</label><input type="date" @bind="offerDraft.LoadingDate" /></div>
-                            <div class="ati-field wide"><label>Примечание</label><input @bind="offerDraft.Note" /></div>
-                        </div>
+                            <div class="ati-field"><label>Предоплата, %</label><input type="number" min="0" max="100" @bind="offerDraft.PrepayPercent" /></div>
+                            <div class="ati-field"><label>Оплата через, банк. дней</label><input type="number" min="0" max="99" @bind="offerDraft.PayAfterBankDays" /></div>
+                            <div class="ati-field wide"><label>Примечание</label><input maxlength="512" @bind="offerDraft.Note" /></div>
+                        </fieldset>
+
                         <div class="ati-actions">
-                            <button disabled="@busy" @onclick="() => Run(() => SendOffer(bc))">Отправить предложение</button>
-                            <button @onclick="() => offerCargoId = null">Отмена</button>
+                            @if (confirmSendOfferId == bc.Id)
+                            {
+                                <div class="ati-msg">
+                                    <strong>Проверьте предложение по грузу № @bc.Number</strong>
+                                    <div>Ставка: @OfferDraftRateText()</div>
+
+                                    @if (offerDraft.LoadingDate is DateTime loadingDate)
+                                    {
+                                        <div>Дата загрузки: @loadingDate.ToString("dd.MM.yyyy")</div>
+                                    }
+                                    @if (offerDraft.PrepayPercent > 0)
+                                    {
+                                        <div>Предоплата: @(offerDraft.PrepayPercent)%</div>
+                                    }
+                                    @if (offerDraft.PayAfterBankDays > 0)
+                                    {
+                                        <div>Оплата через @offerDraft.PayAfterBankDays банк. дн.</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(offerDraft.Note))
+                                    {
+                                        <div>Примечание: @offerDraft.Note</div>
+                                    }
+
+                                    @if (activeOfferCargoIds.Contains(bc.Id) &&
+                                         (!myOffers.TryGetValue(bc.Id, out var savedOffer) ||
+                                          string.IsNullOrEmpty(savedOffer.Id)))
+                                    {
+                                        <div>
+                                            <strong>Внимание:</strong> при замене ATI сначала отзовёт старое
+                                            предложение. Если отправка нового не удастся, старое уже будет отозвано.
+                                        </div>
+                                    }
+
+                                    @if (Svc.IsDryRun)
+                                    {
+                                        <div>DryRun: запрос будет показан, но не отправлен.</div>
+                                    }
+                                </div>
+
+                                <button type="button" disabled="@busy"
+                                        @onclick="() => ConfirmSendOffer(bc)">
+                                    Подтвердить
+                                </button>
+                                <button type="button" disabled="@busy"
+                                        @onclick="() => { confirmSendOfferId = null; }">
+                                    Назад к форме
+                                </button>
+                            }
+                            else
+                            {
+                                <button type="button" disabled="@busy"
+                                        @onclick="() => { confirmSendOfferId = bc.Id; }">
+                                    @(myOffers.ContainsKey(bc.Id) || activeOfferCargoIds.Contains(bc.Id)
+                                        ? "Проверить изменения"
+                                        : "Проверить предложение")
+                                </button>
+                                <button type="button" disabled="@busy"
+                                        @onclick="() => { offerCargoId = null; }">
+                                    Отмена
+                                </button>
+                            }
                         </div>
                     }
                     else
                     {
                         <div class="ati-actions">
-                            @if (sentOffers.Contains(bc.Id))
+                            @if (myOffers.TryGetValue(bc.Id, out var mine))
                             {
-                                <span class="ati-muted">Предложение отправлено</span>
+                                <span class="ati-muted">Ваше предложение: @OfferRateText(mine)</span>
+                                <button disabled="@busy" @onclick="() => OpenOffer(bc, mine)">Изменить</button>
+                                <button disabled="@busy" @onclick="() => Run(() => WithdrawOffer(bc))">Отозвать</button>
                             }
-                            <button disabled="@busy" @onclick="() => OpenOffer(bc)">Сделать предложение</button>
+                            else if (activeOfferCargoIds.Contains(bc.Id))
+                            {
+                                <span class="ati-muted">У вас есть активное предложение</span>
+                                <button disabled="@busy" @onclick="() => OpenOffer(bc)">Изменить</button>
+                                <button disabled="@busy" @onclick="() => Run(() => WithdrawOffer(bc))">Отозвать</button>
+                            }
+                            else
+                            {
+                                <button disabled="@busy" @onclick="() => OpenOffer(bc)">Сделать предложение</button>
+                            }
                         </div>
                     }
-
                 </div>
             </div>
         }
@@ -677,11 +1425,255 @@ else
         }
     }
 
-    @if (raw.Length > 0 && tab != "list")
+@if (tab == "orders")
+{
+    <div class="ati-sec">
+        <h4>Заказы</h4>
+
+        <button type="button" class="ati-btn" disabled="@busy"
+                @onclick="() => Run(LoadOrders)">
+            Загрузить заказы
+        </button>
+
+        @if (orderRows.Count > 0)
+        {
+            <p>Получено заказов: @orderRows.Count</p>
+
+            <div style="overflow-x: auto;">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">№ заказа</th>
+                            <th scope="col">№ груза</th>
+                            <th scope="col">Загрузка → разгрузка</th>
+                            <th scope="col">Статус ATI</th>
+                            <th scope="col">Активные ставки</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var order in orderRows)
+                        {
+                            <tr>
+                                    <td>
+                                        <button type="button" class="ati-btn"
+                                                @onclick="() => { selectedOrder = order; }">
+                                            @order.OrderNumber
+                                        </button>
+                                    </td>
+                                <td>@order.LoadNumber</td>
+                                <td>@order.Route</td>
+                                <td>@order.Status</td>
+                                <td>@order.Rates</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+                @if (selectedOrder is { } details)
+                {
+                    <section class="ati-sec">
+                        <h5>Заказ @details.OrderNumber</h5>
+
+                        <dl>
+                            <dt>Номер груза</dt>
+                            <dd>@details.LoadNumber</dd>
+
+                            <dt>Маршрут</dt>
+                            <dd>@details.Route</dd>
+
+                            <dt>Статус ATI</dt>
+                            <dd>@details.Status</dd>
+
+                            <dt>Активные ставки</dt>
+                            <dd>@details.Rates</dd>
+                        </dl>
+
+                        <button type="button" class="ati-btn"
+                                @onclick="() => { selectedOrder = null; }">
+                            Закрыть
+                        </button>
+                    </section>
+                }
+            }
+    </div>
+    }
+
+    @if (tab == "archive")
+    {
+        <div>
+            <button class="ati-btn" disabled="@busy" @onclick="() => Run(LoadArchive)">@(archiveLoaded ? "Обновить архив" : "Загрузить архив")</button>
+            <button class="ati-btn primary" disabled="@(busy || archiveSel.Count == 0)" @onclick="() => Run(RestoreSelected)">
+                Восстановить выбранные (@archiveSel.Count)
+            </button>
+            @if (confirmDeleteMany)
+            {
+                <span class="ati-muted">Удалить @archiveSel.Count грузов навсегда?</span>
+                <button class="ati-btn" disabled="@busy" @onclick="() => Run(DeleteSelected)">Да, удалить</button>
+                <button class="ati-btn" @onclick="() => confirmDeleteMany = false">Отмена</button>
+            }
+            else
+            {
+                <button class="ati-btn" disabled="@(busy || archiveSel.Count == 0)" @onclick="() => confirmDeleteMany = true">Удалить выбранные</button>
+            }
+            <button class="ati-btn" disabled="@busy" @onclick="() => Run(LoadArchiveOffers)">Предложения на архивные грузы</button>
+        </div>
+
+        @if (archiveLoaded && archived.Count == 0)
+        {
+            <p class="ati-muted">Архив пуст.</p>
+        }
+
+        @foreach (var l in archived)
+        {
+            <div class="ati-card">
+                <div>
+                    <input type="checkbox"
+                           checked="@archiveSel.Contains(l.Id)"
+                           @onchange="e => ToggleArchive(l.Id, e.Value is true)" />
+                </div>
+                <div class="main">
+                    <div class="ati-route">
+                        @Svc.CityName(l.LoadingCityId) → @Svc.CityName(l.UnloadingCityId)
+                        @if (l.Distance > 0)
+                        {
+                            <span class="ati-muted">@l.Distance км</span>
+                        }
+                    </div>
+                    <div>
+                        @l.CargoName
+                        @if (l.Weight > 0)
+                        {
+                            <span> · @l.Weight.ToString("0.###") т</span>
+                        }
+                        @if (l.Volume > 0)
+                        {
+                            <span> · @l.Volume.ToString("0.###") м³</span>
+                        }
+                        @if (Svc.BodyNames(l.CarTypeMask).Length > 0)
+                        {
+                            <span> · @Svc.BodyNames(l.CarTypeMask)</span>
+                        }
+                    </div>
+                    <div><span class="ati-rate">@RateText(l)</span> · @DateText(l)</div>
+                    <div class="ati-muted">
+                        № @l.Number
+                        @if (l.ArchiveDate != null)
+                        {
+                            <span> · в архиве с @l.ArchiveDate.Value.ToString("dd.MM HH:mm")</span>
+                        }
+                        @if (l.ArchiveReason.Length > 0 && l.ArchiveReason != "Unknown")
+                        {
+                            <span> · причина: @l.ArchiveReason</span>
+                        }
+                        @if (l.OfferCount > 0)
+                        {
+                            <span> · предложений: @l.OfferCount</span>
+                        }
+                    </div>
+                    @if (l.Note.Length > 0)
+                    {
+                        <div class="ati-muted">@l.Note</div>
+                    }
+                    @if (l.BoardIds.Count > 0)
+                    {
+                        <div class="ati-muted">Площадки: @Svc.BoardNames(l.BoardIds)</div>
+                    }
+                    @if (archiveComments.TryGetValue(l.Id, out var cms))
+                    {
+                        @foreach (var c in cms)
+                        {
+                            <div class="ati-muted">
+                                Комментарий: @c.Message
+                                @if (c.Date != null)
+                                {
+                                    <span> · @c.Date.Value.ToString("dd.MM HH:mm")</span>
+                                }
+                            </div>
+                        }
+                    }
+                    @if (restoreErrors.TryGetValue(l.Id, out var rsErr))
+                    {
+                        <div class="ati-muted" style="color:#fca5a5">Не восстановлен: @rsErr</div>
+                    }
+                    @if (deleteErrors.TryGetValue(l.Id, out var delErr))
+                    {
+                        <div class="ati-muted" style="color:#fca5a5">Не удалён: @delErr</div>
+                    }
+                    <div class="ati-actions">
+                        @if (confirmDeleteId == l.Id)
+                        {
+                            <span class="ati-muted">Удалить навсегда? Отменить будет нельзя.</span>
+                            <button disabled="@busy" @onclick="() => Run(() => DeleteOne(l))">Да, удалить</button>
+                            <button @onclick="() => confirmDeleteId = null">Отмена</button>
+                        }
+                        else
+                        {
+                            <button disabled="@(busy || !l.CanBeRestored)" @onclick="() => Run(() => RestoreOne(l))">Восстановить</button>
+                            <button disabled="@busy" @onclick="() => Run(() => OpenDraft(l, false))">Копировать</button>
+                            <button disabled="@busy" @onclick="() => confirmDeleteId = l.Id">Удалить навсегда</button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (archiveOffersLoaded)
+        {
+            <h4 class="ati-muted" style="margin-top:18px">Предложения на архивные грузы (за 30 дней)</h4>
+            @if (archiveOffers.Count == 0)
+            {
+                <p class="ati-muted">Предложений нет.</p>
+            }
+        }
+
+        @foreach (var o in archiveOffers)
+        {
+            var load = archived.FirstOrDefault(x => x.Id == o.CargoId);
+
+            <div class="ati-card">
+                <div class="main">
+                    <div class="ati-route">
+                        @o.FirmName
+                        @if (o.Score > 0)
+                        {
+                            <span class="ati-muted">★ @o.Score.ToString("0.#")</span>
+                        }
+                    </div>
+                    <div><span class="ati-rate">@OfferRateText(o)</span></div>
+                    <div class="ati-muted">
+                        Груз № @o.CargoNumber
+                        @if (load != null)
+                        {
+                            <span> · @Svc.CityName(load.LoadingCityId) → @Svc.CityName(load.UnloadingCityId)</span>
+                        }
+                        @if (o.AddedAt != null)
+                        {
+                            <span> · получено @o.AddedAt.Value.ToString("dd.MM HH:mm")</span>
+                        }
+                    </div>
+                    @if (o.ContactName.Length > 0 || o.Phone.Length > 0)
+                    {
+                        <div>
+                            @o.ContactName
+                            @if (o.Phone.Length > 0)
+                            {
+                                <a href="tel:@o.Phone" style="color:#34d399; margin-left:8px">@o.Phone</a>
+                            }
+                        </div>
+                    }
+                    @if (o.Note.Length > 0)
+                    {
+                        <div class="ati-muted">@o.Note</div>
+                    }
+                </div>
+            </div>
+        }
+    }
+
+    @if (raw.Length > 0 && tab != "list" && tab != "orders")
     {
         <pre class="ati-raw">@raw</pre>
     }
-}
 
 @code {
     private static readonly JsonSerializerOptions PrettyJson = new()
@@ -690,11 +1682,22 @@ else
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
+    private static readonly string[] DocTypes =
+    {
+        "заказ",
+        "заказ (табличный вид)",
+        "заявка (к договору)",
+        "заявка к договору (табличный вид)",
+        "поручение экспедитору"
+    };
+
     private string tab = "list";
     private bool busy;
     private string msg = "";
     private bool msgError;
     private string raw = "";
+    private string docUrl = "";
+    private string docType = "заказ";
 
     private AtiAccount? account;
     private List<AtiCarType> carTypes = new();
@@ -702,7 +1705,23 @@ else
     private readonly HashSet<string> selected = new();
     private Dictionary<string, string> refreshErrors = new();
 
+    private List<AtiLoad> archived = new();
+    private bool archiveLoaded;
+    private readonly HashSet<string> archiveSel = new();
+    private Dictionary<string, string> restoreErrors = new();
+    private Dictionary<string, string> deleteErrors = new();
+    private Dictionary<string, List<AtiLoadComment>> archiveComments = new();
+    private List<AtiOffer> archiveOffers = new();
+    private bool archiveOffersLoaded;
+    private string? confirmDeleteId;
+    private bool confirmDeleteMany;
+
     private AtiCargoDraft draft = new();
+    public HashSet<int> BodyLoadingTypeIds { get; set; } = new();
+    public HashSet<int> BodyUnloadingTypeIds { get; set; } = new();
+
+    public bool IsAllBodyLoadingRequired { get; set; }
+    public bool IsAllBodyUnloadingRequired { get; set; }
     private string? editId;
     private string editNumber = "";
 
@@ -711,6 +1730,10 @@ else
     private List<AtiCitySuggestion> loadSug = new();
     private List<AtiCitySuggestion> unloadSug = new();
     private string boardIdsText = "";
+
+    private List<AtiBoard> boards = new();
+    private string boardsError = "";
+    private readonly HashSet<string> boardSearchSel = new();
 
     private List<AtiOffer> offers = new();
     private bool offersLoaded;
@@ -725,7 +1748,8 @@ else
 
     private string? offerCargoId;
     private AtiOfferDraft offerDraft = new();
-    private readonly HashSet<string> sentOffers = new();
+    private readonly Dictionary<string, AtiOffer> myOffers = new();
+    private HashSet<string> activeOfferCargoIds = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -736,7 +1760,10 @@ else
             carTypes = await Svc.GetCarTypesAsync();
             account = await Svc.GetAccountAsync();
             draft.ContactId = account.CurrentContactId;
+            await LoadBoards();
             await LoadCargos();
+            await LoadHandlingOptionsAsync();
+            await LoadCargoNamesAsync();
         });
     }
 
@@ -745,6 +1772,7 @@ else
         busy = true;
         msg = "";
         msgError = false;
+        docUrl = "";
 
         try
         {
@@ -761,7 +1789,102 @@ else
         }
     }
 
+    // ---------- Площадки ----------
+
+    private async Task LoadBoards()
+    {
+        try
+        {
+            boards = await Svc.GetBoardsAsync();
+            boardsError = "";
+        }
+        catch (Exception ex)
+        {
+            boards = new List<AtiBoard>();
+            boardsError = ex.Message;
+        }
+    }
+
+    private void ToggleDraftBoard(string id, bool on)
+    {
+        if (on)
+        {
+            if (!draft.BoardIds.Contains(id)) draft.BoardIds.Add(id);
+        }
+        else
+        {
+            draft.BoardIds.Remove(id);
+        }
+    }
+
+    private void ToggleSearchBoard(string id, bool on)
+    {
+        if (on) boardSearchSel.Add(id);
+        else boardSearchSel.Remove(id);
+    }
+
+    private async Task LoadHandlingOptionsAsync()
+    {
+        try
+        {
+            handlingOptions = await Svc.GetHandlingTypesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Справочник способов не загружен: {ex.Message}");
+        }
+    }
+
+
     // ---------- Мои грузы ----------
+    private string loadContactFilter = "";
+
+    private IEnumerable<AtiLoad> FilteredLoads =>
+        int.TryParse(loadContactFilter, out var contactId)
+            ? loads.Where(l => l.ContactId == contactId)
+            : loads;
+
+    private string LoadContactName(int contactId)
+    {
+        if (contactId <= 0)
+            return "Не указан";
+
+        var contact = account?.Contacts.FirstOrDefault(c => c.Id == contactId);
+
+        return string.IsNullOrWhiteSpace(contact?.Name)
+            ? $"Контакт № {contactId}"
+            : contact!.Name;
+    }
+
+    private async Task RefreshOne(AtiLoad load)
+    {
+        if (!load.CanBeRenewed)
+            return;
+
+        if (Svc.IsDryRun)
+        {
+            msg = "DryRun: запрос на поднятие не отправлен.";
+            return;
+        }
+
+        var result = await Svc.RefreshCargosAsync(new[] { load.Id });
+
+        if (!result.TryGetValue(load.Id, out var error))
+            error = "Нет ответа ATI по грузу.";
+
+        if (!string.IsNullOrEmpty(error))
+        {
+            refreshErrors[load.Id] = error;
+            msg = $"Груз № {load.Number} не поднят: {error}";
+            msgError = true;
+            return;
+        }
+
+        refreshErrors.Remove(load.Id);
+        selected.Remove(load.Id);
+        await LoadCargos();
+        msg = $"Груз № {load.Number} поднят в ТОП.";
+    }
 
     private async Task LoadCargos()
     {
@@ -811,6 +1934,19 @@ else
         selected.Remove(l.Id);
         await LoadCargos();
         msg = "Груз № " + l.Number + " отправлен в архив.";
+    }
+
+    private async Task CreateAtiDoc(AtiLoad l)
+    {
+        if (Svc.IsDryRun)
+        {
+            msg = "DryRun: документ не создан.";
+            return;
+        }
+
+        var result = await Svc.CreateAtiDocAsync(l.Id, docType);
+        docUrl = result.Url;
+        msg = "Документ «" + docType + "» по грузу № " + l.Number + " создан в АТИ-Доках.";
     }
 
     private async Task OpenDraft(AtiLoad l, bool edit)
@@ -870,6 +2006,125 @@ else
         }
 
         return text;
+    }
+
+    // ---------- Поиск транспорта ----------
+
+    private string? truckCargoId;
+    private bool truckDemo = true;
+    private bool truckLastSearchWasDemo;
+    private bool truckSearchCompleted;
+    private int truckTotal;
+    private int truckHidden;
+    private List<AtiService.TruckSearchItem> truckItems = new();
+
+    private async Task FindTrucks(AtiLoad load)
+    {
+        truckCargoId = load.Id;
+        truckSearchCompleted = false;
+        truckItems.Clear();
+
+        var demo = truckDemo || Svc.IsDryRun;
+        var result = await Svc.SearchTrucksAsync(load, demo);
+        truckItems = result.Items;
+        truckTotal = result.Total;
+        truckHidden = result.Hidden;
+        truckLastSearchWasDemo = demo;
+        truckSearchCompleted = true;
+    }
+
+    // ---------- Архив ----------
+
+    private async Task LoadArchive()
+    {
+        raw = "";
+        confirmDeleteId = null;
+        confirmDeleteMany = false;
+
+        archived = await Svc.GetArchivedCargosAsync();
+        archiveLoaded = true;
+        archiveSel.IntersectWith(archived.Select(l => l.Id));
+
+        try
+        {
+            archiveComments = await Svc.GetArchiveCommentsAsync();
+        }
+        catch (Exception ex)
+        {
+            archiveComments = new();
+            msg = "Архив загружен, но комментарии не получены: " + ex.Message;
+            msgError = true;
+        }
+    }
+
+    private void ToggleArchive(string id, bool on)
+    {
+        if (on) archiveSel.Add(id);
+        else archiveSel.Remove(id);
+    }
+
+    private Task RestoreSelected()
+        => RestoreMany(archived.Where(l => archiveSel.Contains(l.Id) && l.CanBeRestored).Select(l => l.Id).ToList());
+
+    private Task RestoreOne(AtiLoad l) => RestoreMany(new[] { l.Id });
+
+    private async Task RestoreMany(IEnumerable<string> ids)
+    {
+        var result = await Svc.RestoreCargosAsync(ids);
+        var ok = result.Count(r => r.Value.Length == 0);
+
+        restoreErrors = result.Where(r => r.Value.Length > 0)
+                              .ToDictionary(r => r.Key, r => r.Value);
+        archiveSel.Clear();
+
+        if (Svc.IsDryRun)
+        {
+            msg = "DryRun: запрос на восстановление не отправлен.";
+            return;
+        }
+
+        await LoadArchive();
+        await LoadCargos();
+
+        msg = "Восстановлено: " + ok + " из " + result.Count +
+              (restoreErrors.Count > 0 ? ". Причины отказа указаны в карточках." : ".");
+        msgError = ok == 0;
+    }
+
+    private Task DeleteSelected() => DeleteMany(archiveSel.ToList());
+
+    private Task DeleteOne(AtiLoad l) => DeleteMany(new[] { l.Id });
+
+    private async Task DeleteMany(IEnumerable<string> ids)
+    {
+        confirmDeleteId = null;
+        confirmDeleteMany = false;
+
+        var result = await Svc.DeleteArchivedCargosAsync(ids);
+        var ok = result.Count(r => r.Value.Length == 0);
+
+        deleteErrors = result.Where(r => r.Value.Length > 0)
+                             .ToDictionary(r => r.Key, r => r.Value);
+        archiveSel.Clear();
+
+        if (Svc.IsDryRun)
+        {
+            msg = "DryRun: запрос на удаление не отправлен.";
+            return;
+        }
+
+        await LoadArchive();
+
+        msg = "Удалено: " + ok + " из " + result.Count +
+              (deleteErrors.Count > 0 ? ". Причины отказа указаны в карточках." : ".");
+        msgError = ok == 0;
+    }
+
+    private async Task LoadArchiveOffers()
+    {
+        raw = "";
+        archiveOffers = await Svc.GetUnpublishedCounterOffersAsync();
+        archiveOffersLoaded = true;
     }
 
     // ---------- Форма ----------
@@ -957,10 +2212,51 @@ else
         }
 
         ResetForm();
+        loadingMethods.Clear();
+        unloadingMethods.Clear();
         await LoadCargos();
         tab = "list";
         msg = editing ? "Изменения сохранены." : "Груз опубликован.";
     }
+
+    private void ToggleBodyType(int id, bool isChecked)
+    {
+        if (isChecked)
+        {
+            if (!draft.BodyTypeIds.Contains(id))
+                draft.BodyTypeIds.Add(id);
+        }
+        else
+        {
+            draft.BodyTypeIds.Remove(id);
+        }
+    }
+
+    private static readonly string[] CargoNames = (
+        "Автомобиль(ли)|Автошины|Алкогольные напитки|Арматура|Балки надрессорные|" +
+        "Безалкогольные напитки|Боковая рама|Бумага|Бытовая техника|Бытовая химия|" +
+        "Вагонка|Газосиликатные блоки|Гипс|Гофрокартон|Грибы|ДВП|ДСП|Двери|" +
+        "Домашний переезд|Доски|Древесина|Древесный уголь|Ж/д запчасти (прочие)|ЖБИ|" +
+        "Животные|Зерно и семена (в упаковке)|Зерно и семена (насыпью)|Игрушки|" +
+        "Изделия из кожи|Изделия из металла|Изделия из резины|Инструмент|Кабель|" +
+        "Канц. товары|Кирпич|Ковры|Колесная пара|Компьютеры|Кондитерские изделия|" +
+        "Консервы|Кормовые/пищевые добавки|Крупа|ЛДСП|Люди|Макулатура|Мебель|" +
+        "Медикаменты|Мел|Металл|Металлолом|Металлопрокат|Минвата|Молоко сухое|" +
+        "Мороженое|Мука|Мясо|Нефтепродукты|Оборудование и запчасти|" +
+        "Оборудование медицинское|Обувь|Овощи|Огнеупорная продукция|Одежда|" +
+        "Парфюмерия и косметика|Пенопласт|Песок|Пиво|Пиломатериалы|Пластик|" +
+        "Поглощающий аппарат|Поддоны|Продукты питания|Профлист|Птица|Рыба (неживая)|" +
+        "СОНК (КП)|Сантехника|Сахар|Сборный груз|Соки|Соль|Стекло и фарфор|" +
+        "Стеклотара (бутылки и др.)|Стройматериалы|Сэндвич-панели|ТНП|" +
+        "Табачные изделия|Тара и упаковка|Текстиль|Торф|Транспортные средства|" +
+        "Трубы|Удобрения|Утеплитель|Фанера|Ферросплавы|Фрукты|" +
+        "Хим. продукты неопасные|Хим. продукты опасные|Хозтовары|" +
+        "Холодильное оборудование|Цветы|Цемент|Чипсы|Шкуры мокросоленые|Шпалы|" +
+        "Щебень|Электроника|Ягоды|" +
+        "20' контейнер|20' контейнер HC|20' реф.контейнер|20' танк-контейнер|" +
+        "40' контейнер|40' контейнер HC|40' реф.контейнер|40' реф.контейнер HC|" +
+        "40' танк-контейнер|45' контейнер (нов.)|45' контейнер (стар.)|45' реф.контейнер"
+    ).Split('|');
 
     private void ResetForm()
     {
@@ -974,7 +2270,122 @@ else
         raw = "";
     }
 
-    // ---------- Встречные предложения ----------
+    // ---------- Встречные предложения на свои грузы ----------
+
+    private string incomingInvitesJson = "";
+    private bool incomingInvitesEmpty;
+
+    private async Task LoadIncomingInvites()
+    {
+        raw = "";
+        incomingInvitesJson = "";
+        incomingInvitesEmpty = false;
+
+        var response = await Svc.GetIncomingInvitesRawAsync();
+
+        if (string.IsNullOrWhiteSpace(response))
+        {
+            msg = "ATI вернул пустое тело ответа.";
+            return;
+        }
+
+        using var doc = JsonDocument.Parse(response);
+        var root = doc.RootElement;
+
+        incomingInvitesEmpty =
+            root.ValueKind == JsonValueKind.Array && root.GetArrayLength() == 0;
+
+        if (!incomingInvitesEmpty)
+            incomingInvitesJson = JsonSerializer.Serialize(root, PrettyJson);
+    }
+
+    // Окна «Кузов / Загрузка / Выгрузка»
+    private string bodyBoxSearch = "";
+    private string loadBoxSearch = "";
+    private string unloadBoxSearch = "";
+
+    private bool bodyBoxSearchOpen;
+    private bool loadBoxSearchOpen;
+    private bool unloadBoxSearchOpen;
+
+    // Состав группы «все закр.+изотерм» (названия без точки в конце)
+    private static readonly string[] ClosedBodyNames =
+    {
+    "тентованный", "контейнер", "фургон", "цельнометалл", "изотермический"
+};
+
+    private static bool IsClosedBody(AtiCarType t)
+    {
+        var name = t.Name.Trim().TrimEnd('.');
+
+        return ClosedBodyNames.Any(n =>
+            string.Equals(n, name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool BodyBoxMatches(AtiCarType t) =>
+        Svc.BodyValue(t) > 0 &&
+        t.Name.Contains(bodyBoxSearch.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    private List<AtiCarType> BodyBoxGroup => carTypes
+        .Where(t => BodyBoxMatches(t) && IsClosedBody(t))
+        .ToList();
+
+    private List<AtiCarType> BodyBoxRest => carTypes
+        .Where(t => BodyBoxMatches(t) && !IsClosedBody(t))
+        .OrderBy(t => t.Name)
+        .ToList();
+
+    private bool IsBodyBoxGroupSelected
+    {
+        get
+        {
+            var ids = carTypes
+                .Where(IsClosedBody)
+                .Select(t => Svc.BodyValue(t))
+                .Where(id => id > 0)
+                .ToList();
+
+            return ids.Count > 0 && ids.All(id => draft.BodyTypeIds.Contains(id));
+        }
+    }
+
+    private List<string> cargoNames = new();
+
+    private async Task LoadCargoNamesAsync()
+    {
+        try
+        {
+            cargoNames = await Svc.GetCargoNamesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Справочник грузов не загружен: {ex.Message}");
+        }
+    }
+
+    private List<(int Id, string Name)> atwLoad =>
+    handlingOptions
+        .Where(o => o.Name.Contains(loadBoxSearch.Trim(), StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    private List<(int Id, string Name)> atwUnload =>
+        handlingOptions
+            .Where(o => o.Name.Contains(unloadBoxSearch.Trim(), StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+    private void SetBodyBoxGroup(bool selected)
+    {
+        foreach (var t in carTypes.Where(IsClosedBody))
+        {
+            var id = Svc.BodyValue(t);
+
+            if (id > 0 && draft.BodyTypeIds.Contains(id) != selected)
+                ToggleBodyType(id, selected);
+        }
+    }
+
+    // Загрузка и выгрузка недоступны, пока не выбран кузов
+    private bool HandlingBoxLocked => draft.BodyTypeIds.Count == 0;
 
     private async Task LoadCounterOffers()
     {
@@ -1023,8 +2434,10 @@ else
     // ---------- Поиск по площадкам ----------
 
     private List<string> ParseBoardIds()
-        => boardIdsText
-            .Split(new[] { ',', ' ', ';' }, StringSplitOptions.RemoveEmptyEntries)
+        => boardSearchSel
+            .Concat(boardIdsText.Split(new[] { ',', ' ', ';' }, StringSplitOptions.RemoveEmptyEntries))
+            .Where(id => id != AtiBoards.CommonId)
+            .Distinct()
             .ToList();
 
     private async Task SearchBoards()
@@ -1037,6 +2450,16 @@ else
         boardTotal = result.Total;
         boardSkip = 100;
         boardSearched = true;
+
+        try
+        {
+            activeOfferCargoIds = await Svc.GetMyOfferStatusesAsync();
+        }
+        catch (Exception ex)
+        {
+            msg = "Грузы найдены, но статусы своих предложений не загружены: " + ex.Message;
+            msgError = true;
+        }
     }
 
     private async Task MoreBoards()
@@ -1054,32 +2477,135 @@ else
         raw = Pretty(await Svc.SearchCargoRawAsync(ParseBoardIds()));
     }
 
-    private void OpenOffer(AtiBoardCargo c)
+    // ---------- Свои предложения на чужие грузы ----------
+
+    private void OpenOffer(AtiBoardCargo c, AtiOffer? existing = null)
     {
+        confirmSendOfferId = null;
+
         offerCargoId = c.Id;
-        offerDraft = new AtiOfferDraft
-        {
-            LoadingDate = c.FirstDate >= DateTime.Today ? c.FirstDate : DateTime.Today
-        };
         raw = "";
+
+        offerDraft = new AtiOfferDraft { ContactId = account?.CurrentContactId ?? 0 };
+
+        if (existing == null)
+        {
+            offerDraft.LoadingDate = c.FirstDate >= DateTime.Today ? c.FirstDate : DateTime.Today;
+            return;
+        }
+
+        offerDraft.NdsPrice = existing.NdsPrice > 0 ? existing.NdsPrice : null;
+        offerDraft.NdsPercent = existing.NdsPercent > 0 ? (int)existing.NdsPercent : 22;
+        offerDraft.NotNdsPrice = existing.NotNdsPrice > 0 ? existing.NotNdsPrice : null;
+        offerDraft.Price = existing.Price > 0 ? existing.Price : null;
+        offerDraft.LoadingDate = existing.LoadingDate;
+        offerDraft.Note = existing.Note;
+    }
+
+    private string? confirmSendOfferId;
+
+    private async Task ConfirmSendOffer(AtiBoardCargo cargo)
+    {
+        if (busy || offerCargoId != cargo.Id || confirmSendOfferId != cargo.Id)
+            return;
+
+        confirmSendOfferId = null;
+        await Run(() => SendOffer(cargo));
+    }
+
+    private bool atwLocked => draft.BodyTypeIds.Count == 0;
+
+    private List<AtiCarType> atwBodies => carTypes
+        .Where(t => Svc.BodyValue(t) > 0 &&
+                    t.Name.Contains(bodyBoxSearch.Trim(), StringComparison.OrdinalIgnoreCase))
+        .GroupBy(t => Svc.BodyValue(t))
+        .Select(g => g.First())
+        .OrderBy(t => t.Name.TrimStart().StartsWith("все закр", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+        .ThenBy(t => t.Name)
+        .ToList();
+
+    private string OfferDraftRateText()
+    {
+        var parts = new List<string>();
+
+        if (offerDraft.NdsPrice is decimal nds && nds > 0)
+            parts.Add($"{nds:N2} ₽ с НДС ({offerDraft.NdsPercent}%)");
+
+        if (offerDraft.NotNdsPrice is decimal withoutNds && withoutNds > 0)
+            parts.Add($"{withoutNds:N2} ₽ без НДС");
+
+        if (offerDraft.Price is decimal cash && cash > 0)
+            parts.Add($"{cash:N2} ₽ наличными");
+
+        return parts.Count == 0 ? "Не указана" : string.Join(" / ", parts);
+    }
+
+    private sealed class AtiOption
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+    }
+
+    private readonly List<AtiOption> bodyTypeOptions = new();
+
+    private void SetBodyType(int id, bool isChecked)
+    {
+        if (isChecked)
+            draft.BodyTypeIds.Add(id);
+        else
+            draft.BodyTypeIds.Remove(id);
     }
 
     private async Task SendOffer(AtiBoardCargo c)
     {
-        var answer = await Svc.CreateCounterOfferAsync(c.Id, offerDraft);
+        (AtiOffer? Offer, string Raw) result;
+        string done;
+
+        if (myOffers.TryGetValue(c.Id, out var existing) && existing.Id.Length > 0)
+        {
+            // ID предложения известен — меняем его напрямую
+            result = await Svc.UpdateCounterOfferAsync(c.Id, existing.Id, offerDraft);
+            done = "Предложение изменено.";
+        }
+        else if (activeOfferCargoIds.Contains(c.Id))
+        {
+            // предложение есть, но ID неизвестен (после перезагрузки) — отзываем и отправляем заново
+            result = await Svc.ReplaceCounterOfferAsync(c.Id, offerDraft);
+            done = "Предложение заменено.";
+        }
+        else
+        {
+            result = await Svc.CreateCounterOfferAsync(c.Id, offerDraft);
+            done = "Предложение по грузу № " + c.Number + " отправлено.";
+        }
 
         if (Svc.IsDryRun)
         {
-            raw = answer;
+            raw = result.Raw;
             msg = "DryRun: предложение не отправлено, тело показано внизу страницы.";
             return;
         }
 
-        sentOffers.Add(c.Id);
+        if (result.Offer != null) myOffers[c.Id] = result.Offer;
+        activeOfferCargoIds.Add(c.Id);
         offerCargoId = null;
-        msg = "Предложение по грузу № " + c.Number + " отправлено.";
+        msg = done;
     }
 
+    private async Task WithdrawOffer(AtiBoardCargo c)
+    {
+        if (Svc.IsDryRun)
+        {
+            msg = "DryRun: запрос на отзыв не отправлен.";
+            return;
+        }
+
+        await Svc.DeleteMyCounterOffersAsync(c.Id);
+        myOffers.Remove(c.Id);
+        activeOfferCargoIds.Remove(c.Id);
+        if (offerCargoId == c.Id) offerCargoId = null;
+        msg = "Предложение по грузу № " + c.Number + " отозвано.";
+    }
 
     private static string BoardRateText(AtiBoardCargo c)
     {
@@ -1114,6 +2640,257 @@ else
         return text.Length > 0 ? text + ", " + dates : dates;
     }
 
+    private string ordersJson = "";
+
+   private readonly System.Collections.Generic.List<AtiOrderRow> orderRows = new();
+
+private sealed record AtiOrderRow(
+    string OrderNumber,
+    string LoadNumber,
+    string Route,
+    string Status,
+    string Rates);
+
+private async Task LoadOrders()
+{
+    raw = "";
+    orderRows.Clear();
+    selectedOrder = null;
+
+    var response = await Svc.SearchOrdersRawAsync();
+
+    if (string.IsNullOrWhiteSpace(response))
+    {
+        throw new InvalidOperationException("ATI вернул пустое тело ответа.");
+    }
+
+    using var doc = JsonDocument.Parse(response);
+    var root = doc.RootElement;
+
+    if (root.ValueKind != JsonValueKind.Array)
+    {
+        throw new InvalidOperationException(
+            "Неожиданный формат ответа ATI: ожидался массив заказов.");
+    }
+
+    foreach (var item in root.EnumerateArray())
+    {
+        var load = OrderField(item, "load_copy");
+        var deal = OrderField(item, "deal");
+
+        orderRows.Add(new AtiOrderRow(
+            OrderText(load, "order_number")
+                ?? OrderText(deal, "deal_id")
+                ?? "—",
+            OrderText(load, "load_number") ?? "—",
+            $"{OrderPoint(OrderField(load, "loading"))} → " +
+            OrderPoint(OrderField(load, "unloading")),
+                OrderStatusLabel(OrderText(deal, "status")),
+            OrderRates(deal)));
+    }
+
+    if (orderRows.Count == 0)
+    {
+        msg = "По текущему фильтру заказов нет.";
+    }
+}
+
+private static JsonElement OrderField(JsonElement parent, string name)
+{
+    return parent.ValueKind == JsonValueKind.Object
+        && parent.TryGetProperty(name, out var value)
+        ? value
+        : default;
+}
+
+    private static readonly string[] HandlingMethods =
+    {
+    "Верхняя",
+    "Боковая",
+    "Задняя",
+    "С полной растентовкой",
+    "Со снятием поперечных перекладин",
+    "Со снятием стоек",
+    "Без ворот",
+    "Гидроборт",
+    "Аппарели",
+    "С обрешёткой",
+    "С бортами",
+    "Боковая с двух сторон",
+    "Налив",
+    "Электрический",
+    "Гидравлический",
+    "Пневматический",
+    "Дизельный компрессор"
+};
+
+    private readonly HashSet<string> loadingMethods = new();
+    private readonly HashSet<string> unloadingMethods = new();
+
+    private (string Title, HashSet<string> Selected)[] HandlingPickers => new[]
+    {
+    ("Погрузка", loadingMethods),
+    ("Выгрузка", unloadingMethods)
+};
+
+    private static void SetHandlingMethod(
+        HashSet<string> selected, string method, bool isChecked)
+    {
+        if (isChecked)
+            selected.Add(method);
+        else
+            selected.Remove(method);
+    }
+
+    private string bodySearchText = "";
+    private string loadingSearchText = "";
+    private string unloadingSearchText = "";
+
+    private IEnumerable<AtiCarType> FilteredBodyTypes =>
+        carTypes
+            .Where(t => Svc.BodyValue(t) > 0 &&
+                        t.Name.Contains(bodySearchText.Trim(),
+                                        StringComparison.OrdinalIgnoreCase))
+            .OrderBy(t => t.Name);
+
+    private static string? OrderText(JsonElement parent, string name)
+    {
+        var value = OrderField(parent, name);
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => string.IsNullOrWhiteSpace(value.GetString())
+                ? null
+                : value.GetString(),
+            JsonValueKind.Number => value.GetRawText(),
+            _ => null
+        };
+    }
+
+    private static void SetHandlingMethod(HashSet<int> ids, int id, bool isChecked)
+    {
+        if (isChecked)
+            ids.Add(id);
+        else
+            ids.Remove(id);
+    }
+
+    private void SetAllHandlingRequired(bool loading, bool isChecked)
+    {
+        if (loading)
+            draft.IsAllBodyLoadingRequired = isChecked;
+        else
+            draft.IsAllBodyUnloadingRequired = isChecked;
+    }
+
+private static string OrderPoint(JsonElement point)
+{
+    var city = OrderText(point, "city_name");
+    var street = OrderText(point, "street");
+
+    if (city is null && OrderText(point, "city_id") is { } cityId)
+    {
+        city = $"город ID {cityId}";
+    }
+
+    return city is null
+        ? street ?? "—"
+        : street is null ? city : $"{city}, {street}";
+}
+
+    // Способы погрузки и выгрузки. Id взять из справочника ATI, см. примечание ниже.
+    private List<(int Id, string Name)> handlingOptions = new();
+    
+
+    private static string OrderStatusLabel(string? code) => code switch
+    {
+        "0" => "Груз зарезервирован перевозчиком",
+        "1" => "Перевозчик заполнил данные, заявка не просмотрена",
+        "2" => "Грузовладелец просмотрел заявку",
+        "3" => "Документ-заявка отправлен перевозчику",
+        "4" => "Заказ в исполнении",
+        "5" => "Заказ завершён и перенесён в архив",
+        "7" => "Есть только приглашение на заказ",
+        "8" => "Есть возможные победители торгов, заказа ещё нет",
+        "9" => "Отклонён автоматически: прошло более 7 дней с последней даты загрузки",
+        "10" => "Заказ завершён, ожидается оплата",
+        "11" => "Лучшая ставка из других торгов",
+        "-11" => "Заказ удалён",
+        "-10" => "Резерв отменён перевозчиком",
+        "-9" => "Грузовладелец сменил победителя после истечения срока подачи документов",
+        "-8" => "Грузовладелец отменил заказ в исполнении",
+        "-7" => "Перевозчик отменил заказ в исполнении",
+        "-6" => "Грузовладелец отклонил заказ после удаления торгов",
+        "-4" => "Грузовладелец отклонил заказ при смене победителя",
+        "-3" => "Заказ отклонён грузовладельцем",
+        "-2" => "Заказ отозван перевозчиком",
+        null => "—",
+        _ => $"Код ATI: {code}"
+    };
+
+    private IEnumerable<(int Id, string Name)> FilterHandlingOptions(string searchText)
+    {
+        var query = searchText.Trim();
+
+        return handlingOptions.Where(option =>
+            option.Name.Contains(query, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void OnCargoNameInput(ChangeEventArgs e)
+    {
+        draft.CargoName = e.Value?.ToString() ?? "";
+        draft.CargoId = 0;
+    }
+
+    private static string FormatOrderRate(string? text)
+    {
+        var invariant = System.Globalization.CultureInfo.InvariantCulture;
+
+        if (!decimal.TryParse(text, System.Globalization.NumberStyles.Float,
+                              invariant, out var amount))
+            return text ?? "—";
+
+        var ru = System.Globalization.CultureInfo.GetCultureInfo("ru-RU");
+        return amount.ToString("#,0.############################", ru);
+    }
+
+private static string OrderRates(JsonElement deal)
+{
+    var rates = OrderField(OrderField(deal, "payment"), "rates");
+
+    if (rates.ValueKind != JsonValueKind.Array)
+    {
+        return "—";
+    }
+
+    var activeRates = new System.Collections.Generic.List<string>();
+
+    foreach (var rate in rates.EnumerateArray())
+    {
+        if (OrderField(rate, "active").ValueKind != JsonValueKind.True
+            || OrderText(rate, "rate") is not { } amount)
+        {
+            continue;
+        }
+            var formattedAmount = FormatOrderRate(amount);
+            var currency = OrderText(rate, "currency");
+            activeRates.Add(currency is null
+                ? formattedAmount
+                : $"{formattedAmount} (код валюты: {currency})");
+    }
+
+    return activeRates.Count == 0 ? "—" : string.Join("; ", activeRates);
+}
+
+    private string bodyTypeSearch = "";
+
+    private List<AtiCarType> VisibleBodyTypes => carTypes
+        .Where(t => Svc.BodyValue(t) > 0 &&
+                    t.Name.Contains(bodyTypeSearch.Trim(),
+                                    StringComparison.OrdinalIgnoreCase))
+        .OrderBy(t => t.Name)
+        .ToList();
+
     private static string Pretty(string json)
     {
         try
@@ -1126,4 +2903,6 @@ else
             return json;
         }
     }
-}
+    private AtiOrderRow? selectedOrder;
+    }
+    }

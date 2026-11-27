@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
@@ -6,6 +7,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using static System.Net.WebRequestMethods;
 
 namespace Logistics.Web.Models
 {
@@ -20,6 +22,7 @@ namespace Logistics.Web.Models
     /// Локальная лента событий АТИ.
     public static class AtiInbox
     {
+        private const int MaxItems = 200;
         private static readonly object _lock = new();
         private static readonly List<AtiNotification> _items = new();
 
@@ -34,10 +37,26 @@ namespace Logistics.Web.Models
                     Text = text ?? ""
                 });
 
-                if (_items.Count > 200)
+                if (_items.Count > MaxItems)
+                    _items.RemoveRange(MaxItems, _items.Count - MaxItems);
+
+                try
                 {
-                    _items.RemoveRange(200, _items.Count - 200);
+                    SqliteStore.SaveAtiNotifications(_items);
                 }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("[ATI] Не удалось сохранить уведомления: " + ex.Message);
+                }
+            }
+        }
+
+        internal static void Restore(IEnumerable<AtiNotification> items)
+        {
+            lock (_lock)
+            {
+                _items.Clear();
+                _items.AddRange(items.Take(MaxItems));
             }
         }
 
@@ -87,6 +106,28 @@ namespace Logistics.Web.Models
         public string Name { get; set; } = "";
     }
 
+    public static class AtiBoards
+    {
+        /// Общая площадка — биржа ATI.SU.
+        public const string CommonId = "a0a0a0a0a0a0a0a0a0a0a0a0";
+        public const string CommonName = "Общая площадка ATI.SU";
+    }
+
+    /// Площадка из GET v2/boards/public/boards/list.
+    public class AtiBoard
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Color { get; set; } = "";
+        public string OwnerAtiId { get; set; } = "";
+        public string Direction { get; set; } = "";
+        public bool CanAdd { get; set; }
+        public bool CanView { get; set; }
+        public bool IsOwner { get; set; }
+        public int ContentCount { get; set; }
+        public int ParticipantsCount { get; set; }
+    }
+
     /// Опубликованный груз из GET v1.0/loads — данные для карточки.
     public class AtiLoad
     {
@@ -121,6 +162,21 @@ namespace Logistics.Web.Models
         public bool CanBeEdited { get; set; }
         public bool CanBeRenewed { get; set; }
         public string RenewRestriction { get; set; } = "";
+        public List<string> BoardIds { get; set; } = new();
+        public int ContactId { get; set; }
+        public DateTime? ArchiveDate { get; set; }
+        public string ArchiveReason { get; set; } = "";
+        public bool CanBeRestored { get; set; }
+    }
+
+    /// Комментарий своей фирмы к архивному грузу.
+    public class AtiLoadComment
+    {
+        public string Id { get; set; } = "";
+        public string LoadId { get; set; } = "";
+        public string Message { get; set; } = "";
+        public int ContactId { get; set; }
+        public DateTime? Date { get; set; }
     }
 
     /// Черновик груза. Идентификаторы — числовые ID из справочников ATI.SU.
@@ -133,6 +189,9 @@ namespace Logistics.Web.Models
         public string LoadingCityName { get; set; } = "";
         public string LoadingAddress { get; set; } = "";
         public DateTime LoadingDate { get; set; } = DateTime.Today;
+        public List<string> BoardIds { get; set; } = new() { AtiBoards.CommonId };
+        /// now, 15m, 30m, 1h, 3h, 6h
+        public string PublicationMode { get; set; } = "now";
 
         // Разгрузка
         public int UnloadingCityId { get; set; }
@@ -148,8 +207,17 @@ namespace Logistics.Web.Models
         public decimal Volume { get; set; }
 
         // Машина
-        public int BodyTypeId { get; set; }         // TypeId из справочника; 0 — не выбран
+        // Машина
+        public List<int> BodyTypeIds { get; set; } = new();
+
+        public HashSet<int> BodyLoadingTypeIds { get; set; } = new();
+        public HashSet<int> BodyUnloadingTypeIds { get; set; } = new();
+
+        public bool IsAllBodyLoadingRequired { get; set; }
+        public bool IsAllBodyUnloadingRequired { get; set; }
+
         public int TrucksCount { get; set; } = 1;
+
         public string LoadType { get; set; } = "ftl";
         public decimal RequiredCapacity { get; set; } = 20;
 
@@ -212,8 +280,9 @@ namespace Logistics.Web.Models
 namespace Logistics.Web.Services
 {
     using Logistics.Web.Models;
+    using static System.Formats.Asn1.AsnWriter;
 
-    /// Встречное предложение (отзыв) на свой груз.
+    /// Встречное предложение (отзыв) на груз.
     public class AtiOffer
     {
         public string Id { get; set; } = "";
@@ -233,6 +302,8 @@ namespace Logistics.Web.Services
         public bool IsOutdated { get; set; }
         public bool IsNoLoad { get; set; }
     }
+
+
 
     /// Груз с закрытой площадки (результат поиска по площадкам).
     public class AtiBoardCargo
@@ -266,16 +337,19 @@ namespace Logistics.Web.Services
         public string Note { get; set; } = "";
     }
 
-    /// Своё предложение на чужой груз.
+    /// Своё предложение на чужой груз. Валюта всегда рубли (id = 1).
     public class AtiOfferDraft
     {
+        public int ContactId { get; set; }
         public decimal? NdsPrice { get; set; }
+        public int NdsPercent { get; set; } = 22;
         public decimal? NotNdsPrice { get; set; }
         public decimal? Price { get; set; }
+        public int PrepayPercent { get; set; }
+        public int PayAfterBankDays { get; set; }
         public DateTime? LoadingDate { get; set; }
         public string Note { get; set; } = "";
     }
-
 
     public class AtiEndpoints
     {
@@ -290,6 +364,7 @@ namespace Logistics.Web.Services
 
     public class AtiOptions
     {
+        public string OrdersSearchBodyJson { get; set; } = "";
         public string BaseUrl { get; set; } = "https://api.ati.su";
         public string Token { get; set; } = "";
         public DateTime ExpiresAt { get; set; } = DateTime.MinValue;
@@ -306,9 +381,14 @@ namespace Logistics.Web.Services
     }
 
     public class AtiService
+
     {
         // Общая площадка ATI.SU — в форму как «ID площадки» не подставляется.
-        private const string CommonBoardId = "a0a0a0a0a0a0a0a0a0a0a0a0";
+        private const string CommonBoardId = AtiBoards.CommonId;
+        private static List<AtiBoard>? _boardsCache;
+
+        // Встречные предложения (новый API).
+        private const string OffersApi = "gw/cargo-counter-offers-api/integrator/v1/cargos/";
 
         private static readonly JsonSerializerOptions Json = new()
         {
@@ -317,6 +397,7 @@ namespace Logistics.Web.Services
             NumberHandling = JsonNumberHandling.AllowReadingFromString
         };
 
+
         private static readonly JsonSerializerOptions Pretty = new()
         {
             WriteIndented = true,
@@ -324,12 +405,17 @@ namespace Logistics.Web.Services
             Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
 
+
         // Справочники меняются редко — кэшируем на время работы приложения.
         private static List<AtiCarType>? _carTypesCache;
         private static AtiAccount? _accountCache;
 
         // Названия городов, которые уже встречались в автокомплите.
-        private static readonly ConcurrentDictionary<int, string> _cityNames = new();
+        private static readonly ConcurrentDictionary<int, string> _cityNames = new()
+        {
+            [120] = "Краснодар",
+            [170] = "Новосибирск"
+        };
 
         private readonly HttpClient _http;
         private readonly AtiOptions _opt;
@@ -417,6 +503,54 @@ namespace Logistics.Web.Services
                 ? "—"
                 : (_cityNames.TryGetValue(cityId, out var n) ? n : "Город #" + cityId);
 
+        private async Task LoadCityNamesAsync(IEnumerable<int> cityIds)
+        {
+            var missingIds = cityIds
+                .Where(id => id > 0 && !_cityNames.ContainsKey(id))
+                .Distinct()
+                .ToArray();
+
+            foreach (var ids in missingIds.Chunk(1000))
+            {
+                try
+                {
+                    var raw = await PostAsync<string>(
+                        "gw/gis-dict/v1/cities/by-ids",
+                        new { ids });
+
+                    using var doc = JsonDocument.Parse(raw);
+                    var cities = Child(doc.RootElement, "cities");
+
+                    if (cities.ValueKind != JsonValueKind.Array)
+                    {
+                        Console.Error.WriteLine("[ATI] Справочник не вернул массив cities.");
+                        continue;
+                    }
+
+                    var requestedIds = ids.ToHashSet();
+
+                    foreach (var city in cities.EnumerateArray())
+                    {
+                        var id = Int(city, "city_id");
+                        var name = StrAny(city, "name", "clarified_name");
+
+                        if (requestedIds.Contains(id) && !string.IsNullOrWhiteSpace(name))
+                        {
+                            _cityNames[id] = name.Trim();
+                        }
+                    }
+                }
+                catch (Exception ex) when (ex is AtiApiException or HttpRequestException
+                                           or TaskCanceledException or JsonException)
+                {
+                    // Сбой справочника не должен мешать показу грузов.
+                    Console.Error.WriteLine(
+                        $"[ATI] Не удалось получить названия городов ({ex.GetType().Name}).");
+                    break;
+                }
+            }
+        }
+
         /// Справочник типов кузовов (с кэшем).
         public async Task<List<AtiCarType>> GetCarTypesAsync()
         {
@@ -460,6 +594,17 @@ namespace Logistics.Web.Services
                 .Select(t => t.Name));
         }
 
+        /// Названия кузовов по списку TypeId (поле body_types).
+        public string BodyNamesByTypeIds(IEnumerable<int> typeIds)
+        {
+            if (_carTypesCache == null) return "";
+
+            var set = typeIds.ToHashSet();
+            return string.Join(", ", _carTypesCache
+                .Where(t => set.Contains(t.TypeId))
+                .Select(t => t.Name));
+        }
+
         /// Фирма и контакты аккаунта, которому принадлежит токен (с кэшем).
         public async Task<AtiAccount> GetAccountAsync()
         {
@@ -499,6 +644,76 @@ namespace Logistics.Web.Services
             return acc;
         }
 
+        private static object? BuildBodyHandling(
+    HashSet<int> ids, bool isAllRequired)
+        {
+            if (ids.Count == 0)
+                return null;
+
+            return new
+            {
+                types = ids.OrderBy(id => id).ToArray(),
+                is_all_required = isAllRequired
+            };
+        }
+
+        // ---------- Площадки ----------
+
+        /// Все площадки, где контакт может добавлять или смотреть грузы (с кэшем).
+        public async Task<List<AtiBoard>> GetBoardsAsync(bool force = false)
+        {
+            if (_boardsCache != null && !force) return _boardsCache;
+
+            var raw = await GetAsync<string>("v2/boards/public/boards/list");
+            var list = new List<AtiBoard>();
+
+            if (!string.IsNullOrWhiteSpace(raw))
+            {
+                var myAtiId = _accountCache?.AtiId ?? "";
+
+                using var doc = JsonDocument.Parse(raw);
+                if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var b in doc.RootElement.EnumerateArray())
+                    {
+                        var id = Str(b, "id");
+                        if (string.IsNullOrEmpty(id) || id == CommonBoardId) continue;
+
+                        var owner = Str(b, "owner_ati_id") ?? "";
+                        list.Add(new AtiBoard
+                        {
+                            Id = id,
+                            Name = Str(b, "name") ?? id,
+                            Color = Str(b, "color") ?? "",
+                            OwnerAtiId = owner,
+                            Direction = Str(b, "board_exchange_direction") ?? "",
+                            CanAdd = Bool(b, "can_add"),
+                            CanView = Bool(b, "can_view"),
+                            IsOwner = owner.Length > 0 && owner == myAtiId,
+                            ContentCount = Int(b, "content_count"),
+                            ParticipantsCount = Int(b, "participants_count")
+                        });
+                    }
+                }
+            }
+
+            _boardsCache = list.OrderByDescending(b => b.IsOwner).ThenBy(b => b.Name).ToList();
+            return _boardsCache;
+        }
+
+        /// Название площадки по ID; общая площадка распознаётся всегда.
+        public string BoardName(string boardId)
+        {
+            if (boardId == CommonBoardId) return AtiBoards.CommonName;
+            var b = _boardsCache?.FirstOrDefault(x => x.Id == boardId);
+            return b?.Name ?? ("Площадка " + boardId);
+        }
+
+        /// Названия площадок через запятую.
+        public string BoardNames(IEnumerable<string> boardIds)
+            => string.Join(", ", boardIds.Select(BoardName));
+
+
         // ---------- Публикация и редактирование ----------
 
         public Task<string> CreateCargoAsync(AtiCargoDraft d)
@@ -527,6 +742,7 @@ namespace Logistics.Web.Services
 
             return PutAsync<string>(CargoRoute() + "/" + Uri.EscapeDataString(cargoId),
                 new { cargo_application = BuildCargoApplication(d) });
+
         }
 
         /// Тело запроса без отправки — для сверки перед публикацией.
@@ -559,7 +775,11 @@ namespace Logistics.Web.Services
             if (string.IsNullOrWhiteSpace(d.CargoName)) p.Add("не указано название груза");
             if (d.Weight <= 0) p.Add("вес должен быть больше 0");
             if (d.LoadingDate.Date < DateTime.Today) p.Add("дата загрузки в прошлом");
-            if (d.BodyTypeId <= 0) p.Add("не выбран кузов");
+            if (d.BodyTypeIds.Count == 0)
+                p.Add("выберите хотя бы один кузов");
+            if (d.BoardIds.Count == 0) p.Add("выберите хотя бы одну площадку");
+            if (d.PublicationMode is not ("now" or "15m" or "30m" or "1h" or "3h" or "6h"))
+                p.Add("неверный режим публикации");
 
             if (IsShortAddress(d.LoadingAddress)) p.Add("адрес загрузки короче 5 символов");
             if (IsShortAddress(d.UnloadingAddress)) p.Add("адрес разгрузки короче 5 символов");
@@ -582,7 +802,6 @@ namespace Logistics.Web.Services
         private static bool IsShortAddress(string? a)
             => !string.IsNullOrWhiteSpace(a) && a.Trim().Length < 5;
 
-
         // ---------- Мои грузы ----------
 
         public Task<string> GetMyCargoRawAsync()
@@ -591,7 +810,17 @@ namespace Logistics.Web.Services
         /// Опубликованные грузы фирмы — разобранные для карточек.
         public async Task<List<AtiLoad>> GetMyCargosAsync()
         {
-            var raw = await GetMyCargoRawAsync();
+            var list = ParseLoads(await GetMyCargoRawAsync());
+
+            await LoadCityNamesAsync(
+                list.SelectMany(l => new[] { l.LoadingCityId, l.UnloadingCityId }));
+
+            return list;
+        }
+
+        /// Разбор массива грузов формата v1.0 (опубликованные и архивные).
+        private static List<AtiLoad> ParseLoads(string raw)
+        {
             var list = new List<AtiLoad>();
             if (string.IsNullOrWhiteSpace(raw)) return list;
 
@@ -602,6 +831,16 @@ namespace Logistics.Web.Services
             {
                 var loading = Child(x, "Loading");
                 var unloading = Child(x, "Unloading");
+                foreach (var point in new[] { loading, unloading })
+                {
+                    var cityId = Int(point, "CityId");
+                    var cityName = StrAny(point, "CityName", "city_name");
+
+                    if (cityId > 0 && !string.IsNullOrWhiteSpace(cityName))
+                    {
+                        _cityNames[cityId] = cityName.Trim();
+                    }
+                }
                 var cargo = Child(x, "Cargo");
                 var transport = Child(x, "Transport");
                 var payment = Child(x, "Payment");
@@ -612,6 +851,18 @@ namespace Logistics.Web.Services
                 {
                     mask = ULong(transport, "CarType");
                 }
+
+                var boardIds = new List<string>();
+                var boardsEl = Child(x, "Boards");
+                if (boardsEl.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var b in boardsEl.EnumerateArray())
+                    {
+                        var bid = Str(b, "BoardId");
+                        if (!string.IsNullOrEmpty(bid)) boardIds.Add(bid);
+                    }
+                }
+
 
                 list.Add(new AtiLoad
                 {
@@ -639,7 +890,12 @@ namespace Logistics.Web.Services
                     Note = Str(x, "Note") ?? "",
                     CanBeEdited = Bool(x, "CanBeEdited"),
                     CanBeRenewed = Bool(x, "CanBeRenewed"),
-                    RenewRestriction = Str(x, "RenewRestriction") ?? ""
+                    RenewRestriction = Str(x, "RenewRestriction") ?? "",
+                    BoardIds = boardIds,
+                                        ContactId = Int(x, "ContactId1"),
+                    ArchiveDate = Date(x, "ArchiveDate")?.LocalDateTime,
+                    ArchiveReason = Str(x, "ArchiveReason") ?? "",
+                    CanBeRestored = Bool(x, "CanBeRestored")
                 });
             }
 
@@ -647,6 +903,33 @@ namespace Logistics.Web.Services
         }
 
         /// Груз в виде черновика формы — для «Редактировать» и «Копировать».
+        /// Груз в виде черновика формы — для «Редактировать» и «Копировать».
+
+        private static (HashSet<int> Ids, bool AllRequired) ReadBodyHandling(
+            JsonElement truck, string propertyName)
+        {
+            var ids = new HashSet<int>();
+            var handling = Child(truck, propertyName);
+
+            if (handling.ValueKind != JsonValueKind.Object)
+                return (ids, false);
+
+            var types = Child(handling, "types");
+            if (types.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in types.EnumerateArray())
+                {
+                    if (item.ValueKind == JsonValueKind.Number &&
+                        item.TryGetInt32(out var id))
+                    {
+                        ids.Add(id);
+                    }
+                }
+            }
+
+            var allRequired = Child(handling, "is_all_required");
+            return (ids, allRequired.ValueKind == JsonValueKind.True);
+        }
         public async Task<AtiCargoDraft> GetCargoDraftAsync(string cargoId)
         {
             var raw = await GetAsync<string>(CargoRoute() + "/" + Uri.EscapeDataString(cargoId));
@@ -662,6 +945,9 @@ namespace Logistics.Web.Services
             var uCity = Child(unloading, "city");
             var cargo = First(Child(loading, "cargos"));
             var truck = Child(app, "truck");
+
+            var loadingHandling = ReadBodyHandling(truck, "body_loading");
+            var unloadingHandling = ReadBodyHandling(truck, "body_unloading");
             var payment = Child(app, "payment");
             var rate = First(Child(payment, "rates_with_vat"));
 
@@ -675,22 +961,45 @@ namespace Logistics.Web.Services
             var lCityId = Int(lCity, "city_id");
             if (lCityId == 0) lCityId = Int(loading, "city_id");
             var uCityId = Int(uCity, "city_id");
-            if (uCityId == 0) uCityId = Int(unloading, "city_id");
+            var bodyTypeIds = new List<int>();
+            var bodyTypes = Child(truck, "body_types");
 
-            var body = First(Child(truck, "body_types"));
+            if (bodyTypes.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in bodyTypes.EnumerateArray())
+                {
+                    if (item.ValueKind == JsonValueKind.Number &&
+                        item.TryGetInt32(out var id) &&
+                        id > 0 &&
+                        !bodyTypeIds.Contains(id))
+                    {
+                        bodyTypeIds.Add(id);
+                    }
+                }
+            }
 
-            var boardId = "";
+            if (bodyTypes.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in bodyTypes.EnumerateArray())
+                {
+                    if (item.ValueKind == JsonValueKind.Number &&
+                        item.TryGetInt32(out var bodyTypeId) &&
+                        bodyTypeId > 0 &&
+                        !bodyTypeIds.Contains(bodyTypeId))
+                    {
+                        bodyTypeIds.Add(bodyTypeId);
+                    }
+                }
+            }
+
+            var boardIds = new List<string>();
             var boards = Child(app, "boards");
             if (boards.ValueKind == JsonValueKind.Array)
             {
                 foreach (var b in boards.EnumerateArray())
                 {
                     var id = Str(b, "id");
-                    if (!string.IsNullOrEmpty(id) && id != CommonBoardId)
-                    {
-                        boardId = id;
-                        break;
-                    }
+                    if (!string.IsNullOrEmpty(id) && !boardIds.Contains(id)) boardIds.Add(id);
                 }
             }
 
@@ -698,6 +1007,11 @@ namespace Logistics.Web.Services
 
             var d = new AtiCargoDraft
             {
+                BodyLoadingTypeIds = loadingHandling.Ids,
+                BodyUnloadingTypeIds = unloadingHandling.Ids,
+                IsAllBodyLoadingRequired = loadingHandling.AllRequired,
+                IsAllBodyUnloadingRequired = unloadingHandling.AllRequired,
+
                 LoadingCityId = lCityId,
                 LoadingRegionId = Int(lCity, "region_id"),
                 LoadingCityName = CityName(lCityId),
@@ -714,7 +1028,7 @@ namespace Logistics.Web.Services
                 Weight = weight,
                 Volume = Dec(Child(cargo, "volume"), "quantity") ?? 0,
 
-                BodyTypeId = body.ValueKind == JsonValueKind.Number && body.TryGetInt32(out var bt) ? bt : 0,
+                BodyTypeIds = bodyTypeIds,
                 TrucksCount = Math.Max(1, Int(truck, "trucks_count")),
                 LoadType = Str(truck, "load_type") ?? "ftl",
                 RequiredCapacity = Dec(truck, "required_capacity") ?? 20,
@@ -731,7 +1045,7 @@ namespace Logistics.Web.Services
                     : null,
 
                 ContactId = Int(First(Child(app, "application_contacts")), "id"),
-                BoardId = boardId,
+                BoardIds = boardIds.Count > 0 ? boardIds : new List<string> { CommonBoardId },
                 Note = Str(app, "note") ?? ""
             };
 
@@ -739,6 +1053,34 @@ namespace Logistics.Web.Services
             if (Int(uCity, "country_id") > 0) d.UnloadingCountryId = Int(uCity, "country_id");
 
             return d;
+        }
+
+        public async Task<List<string>> GetCargoNamesAsync(CancellationToken ct = default)
+        {
+            const string url = "https://api.ati.su/gw/dictionaries/v1/cargo_typ?locale=ru";
+
+            var items = await _http.GetFromJsonAsync<List<AtiLoadType>>(url, ct)
+                        ?? new List<AtiLoadType>();
+
+            return items
+                .Select(i => i.Attributes.TryGetValue("cargo_name", out var n) ? n.Trim() : "")
+                .Where(n => n.Length > 0)
+                .Distinct()
+                .ToList();
+        }
+
+        public async Task<List<(int Id, string Name)>> GetHandlingTypesAsync(
+    CancellationToken ct = default)
+        {
+            const string url = "https://api.ati.su/gw/dictionaries/v1/load_type?locale=ru";
+
+            var items = await _http.GetFromJsonAsync<List<AtiLoadType>>(url, ct)
+                        ?? new List<AtiLoadType>();
+
+            return items
+                .Where(i => i.Id > 0 && !string.IsNullOrWhiteSpace(i.Name))
+                .Select(i => (i.Id, i.Name))
+                .ToList();
         }
 
         /// Поднять грузы в выдаче (до 100 за запрос, не чаще раза в 60 минут на груз).
@@ -779,161 +1121,6 @@ namespace Logistics.Web.Services
             }
 
             return result;
-        }
-
-        // ---------- Поиск и встречные предложения (сырой JSON) ----------
-
-        /// Грузы с закрытых площадок контакта. Ответ: { cargos: [...], total }.
-        public Task<string> SearchCargoRawAsync(List<string>? boardIds = null)
-        {
-            var route = Need(_opt.Endpoints.CargoSearchByBoards,
-                nameof(AtiEndpoints.CargoSearchByBoards));
-
-            var parts = (boardIds ?? new List<string>())
-                .Select(id => "board_ids=" + Uri.EscapeDataString(id))
-                .ToList();
-            parts.Add("skip=0");
-            parts.Add("take=100");
-
-            return GetAsync<string>(route + "?" + string.Join("&", parts));
-        }
-
-        public Task<string> GetCounterOffersRawAsync()
-            => GetAsync<string>(
-                Need(_opt.Endpoints.CounterOffersAll, nameof(AtiEndpoints.CounterOffersAll)));
-
-        /// Встречные предложения, разобранные для карточек.
-        /// Понимает оба формата ATI: v1.0 (ResponseId, NdsPrice) и gw (id, nds_price).
-        public async Task<List<AtiOffer>> GetCounterOffersAsync()
-        {
-            var raw = await GetCounterOffersRawAsync();
-            var list = new List<AtiOffer>();
-            if (string.IsNullOrWhiteSpace(raw)) return list;
-
-            using var doc = JsonDocument.Parse(raw);
-            CollectOffers(doc.RootElement, list, 0);
-
-            return list.OrderByDescending(o => o.AddedAt).ToList();
-        }
-
-        private static void CollectOffers(JsonElement el, List<AtiOffer> list, int depth)
-        {
-            if (depth > 4) return;
-
-            if (el.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var x in el.EnumerateArray()) CollectOffers(x, list, depth + 1);
-                return;
-            }
-
-            if (el.ValueKind != JsonValueKind.Object) return;
-
-            var id = StrAny(el, "id", "ResponseId");
-            var cargoId = StrAny(el, "cargo_id", "LoadId");
-
-            if (id == null || cargoId == null)
-            {
-                // словарь «id груза → { Result: [...] }»
-                foreach (var p in el.EnumerateObject()) CollectOffers(p.Value, list, depth + 1);
-                return;
-            }
-
-            var firm = ChildAny(el, "firm_info");
-            if (firm.ValueKind != JsonValueKind.Object) firm = ChildAny(el, "FirmInfo");
-            var contact = ChildAny(firm, "contact");
-
-            list.Add(new AtiOffer
-            {
-                Id = id,
-                CargoId = cargoId,
-                CargoNumber = StrAny(el, "cargo_number", "LoadNumber") ?? "",
-                FirmName = StrAny(el, "FirmName") ?? StrAny(firm, "full_firm_name", "FullFirmName") ?? "",
-                Score = DecAny(firm, "total_score", "TotalScore") ?? 0,
-                ContactName = StrAny(contact, "name") ?? "",
-                Phone = StrAny(contact, "mobile", "telephone") ?? "",
-                Price = DecAny(el, "price") ?? 0,
-                NdsPrice = DecAny(el, "nds_price", "NdsPrice") ?? 0,
-                NotNdsPrice = DecAny(el, "not_nds_price", "NotNdsPrice") ?? 0,
-                NdsPercent = DecAny(el, "nds_percent", "NdsPercent") ?? 0,
-                Note = StrAny(el, "note") ?? "",
-                LoadingDate = DateAny(el, "loading_date", "LoadingDate")?.Date,
-                AddedAt = DateAny(el, "added_at", "AddedAt")?.LocalDateTime,
-                IsOutdated = ChildAny(el, "is_outdated").ValueKind == JsonValueKind.True ||
-                             ChildAny(el, "IsOutdated").ValueKind == JsonValueKind.True,
-                IsNoLoad = ChildAny(el, "IsNoLoad").ValueKind == JsonValueKind.True
-            });
-        }
-
-        /// Удалить чужое встречное предложение на своём грузе.
-        public async Task DeleteCounterOfferAsync(string cargoId, string offerId)
-        {
-            HttpResponseMessage resp;
-            var cargo = Uri.EscapeDataString(cargoId);
-
-            if ((_opt.Endpoints.CounterOffersAll ?? "")
-                .Contains("cargo-counter-offers-api", StringComparison.OrdinalIgnoreCase))
-            {
-                var req = new HttpRequestMessage(HttpMethod.Delete,
-                    "gw/cargo-counter-offers-api/integrator/v1/cargos/" + cargo + "/counter-offers")
-                {
-                    Content = JsonContent.Create(new[] { offerId })
-                };
-                resp = await _http.SendAsync(req);
-            }
-            else
-            {
-                var ids = Uri.EscapeDataString(JsonSerializer.Serialize(new[] { offerId }));
-                resp = await _http.DeleteAsync("v1.0/loads/new/" + cargo + "/responses?ids=" + ids);
-            }
-
-            var raw = await ReadAsync<string>(resp);
-            if (string.IsNullOrWhiteSpace(raw)) return;
-
-            using var doc = JsonDocument.Parse(raw);
-            if (doc.RootElement.ValueKind != JsonValueKind.Object) return;
-
-            foreach (var p in doc.RootElement.EnumerateObject())
-            {
-                var status = DecAny(p.Value, "Status");
-                var error = StrAny(p.Value, "error");
-
-                if ((status != null && status != 0) || error != null)
-                {
-                    throw new InvalidOperationException(
-                        "ATI не удалил предложение: " + (error ?? StrAny(p.Value, "message") ?? "ошибка"));
-                }
-            }
-        }
-
-        private static decimal? DecAny(JsonElement el, params string[] names)
-        {
-            foreach (var n in names)
-            {
-                var s = ToText(ChildAny(el, n));
-                if (s != null &&
-                    decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var d))
-                {
-                    return d;
-                }
-            }
-
-            return null;
-        }
-
-        private static DateTimeOffset? DateAny(JsonElement el, params string[] names)
-        {
-            foreach (var n in names)
-            {
-                var v = ChildAny(el, n);
-                if (v.ValueKind == JsonValueKind.String &&
-                    DateTimeOffset.TryParse(v.GetString(), CultureInfo.InvariantCulture,
-                        DateTimeStyles.AssumeUniversal, out var d))
-                {
-                    return d;
-                }
-            }
-
-            return null;
         }
 
         /// Снять грузы с публикации и отправить в архив (до 100 за запрос).
@@ -977,8 +1164,157 @@ namespace Logistics.Web.Services
             return result;
         }
 
+        // ---------- Архив ----------
+
+        private const string ArchiveApi = "v1.0/unpublished-loads";
+
+        /// Архивные грузы фирмы, свежие сверху.
+        public async Task<List<AtiLoad>> GetArchivedCargosAsync()
+        {
+            var list = ParseLoads(await GetAsync<string>(ArchiveApi));
+
+            await LoadCityNamesAsync(
+                list.SelectMany(l => new[] { l.LoadingCityId, l.UnloadingCityId }));
+
+            return list.OrderByDescending(l => l.ArchiveDate).ToList();
+        }
+        /// Восстановить грузы из архива (до 100). Даты ATI сдвигает на сегодня сам.
+        /// Результат: id груза → "" при успехе или текст ошибки.
+        public async Task<Dictionary<string, string>> RestoreCargosAsync(IEnumerable<string> cargoIds)
+        {
+            var ids = cargoIds.Where(i => !string.IsNullOrWhiteSpace(i)).Distinct().Take(100).ToList();
+            var result = new Dictionary<string, string>();
+            if (ids.Count == 0) return result;
+
+            if (_opt.DryRun)
+            {
+                foreach (var id in ids) result[id] = "DRY-RUN: запрос не отправлен";
+                return result;
+            }
+
+            var url = ArchiveApi + "/restore?ids=" + Uri.EscapeDataString(JsonSerializer.Serialize(ids));
+            using var req = new HttpRequestMessage(HttpMethod.Put, url);
+            var raw = await ReadAsync<string>(await _http.SendAsync(req));
+
+            if (!string.IsNullOrWhiteSpace(raw))
+            {
+                using var doc = JsonDocument.Parse(raw);
+                if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var p in doc.RootElement.EnumerateObject())
+                    {
+                        var status = DecAny(p.Value, "Status") ?? -1;
+                        result[p.Name] = status == 0
+                            ? ""
+                            : (StrAny(p.Value, "Message") ?? "ошибка " + status);
+                    }
+                }
+            }
+
+            foreach (var id in ids)
+            {
+                if (!result.ContainsKey(id)) result[id] = "нет ответа по грузу";
+            }
+
+            return result;
+        }
+
+        /// Удалить архивные грузы безвозвратно (до 100).
+        /// Результат: id груза → "" при успехе или текст ошибки.
+        public async Task<Dictionary<string, string>> DeleteArchivedCargosAsync(IEnumerable<string> cargoIds)
+        {
+            var ids = cargoIds.Where(i => !string.IsNullOrWhiteSpace(i)).Distinct().Take(100).ToList();
+            var result = new Dictionary<string, string>();
+            if (ids.Count == 0) return result;
+
+            if (_opt.DryRun)
+            {
+                foreach (var id in ids) result[id] = "DRY-RUN: запрос не отправлен";
+                return result;
+            }
+
+            using var req = new HttpRequestMessage(HttpMethod.Delete, CargoRoute())
+            {
+                Content = JsonContent.Create(new { cargo_application_ids = ids })
+            };
+            var raw = await ReadAsync<string>(await _http.SendAsync(req));
+
+            if (!string.IsNullOrWhiteSpace(raw))
+            {
+                using var doc = JsonDocument.Parse(raw);
+                var map = Child(doc.RootElement, "cargo_application_ids");
+                if (map.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var p in map.EnumerateObject())
+                    {
+                        result[p.Name] = Str(p.Value, "type") == "success"
+                            ? ""
+                            : (Str(p.Value, "reason") ?? Str(p.Value, "error_code") ?? "ошибка");
+                    }
+                }
+            }
+
+            foreach (var id in ids)
+            {
+                if (!result.ContainsKey(id)) result[id] = "нет ответа по грузу";
+            }
+
+            return result;
+        }
+
+        /// Комментарии своей фирмы ко всем архивным грузам: id груза → список.
+        public async Task<Dictionary<string, List<AtiLoadComment>>> GetArchiveCommentsAsync()
+        {
+            var raw = await GetAsync<string>(ArchiveApi + "/comments");
+            var result = new Dictionary<string, List<AtiLoadComment>>();
+            if (string.IsNullOrWhiteSpace(raw)) return result;
+
+            using var doc = JsonDocument.Parse(raw);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object) return result;
+
+            foreach (var p in doc.RootElement.EnumerateObject())
+            {
+                if (p.Value.ValueKind != JsonValueKind.Array) continue;
+
+                var list = new List<AtiLoadComment>();
+                foreach (var c in p.Value.EnumerateArray())
+                {
+                    list.Add(new AtiLoadComment
+                    {
+                        Id = Str(c, "CommentId") ?? "",
+                        LoadId = Str(c, "LoadId") ?? p.Name,
+                        Message = Str(c, "Message") ?? "",
+                        ContactId = Int(c, "ContactId"),
+                        Date = Date(c, "CommentDateTime")?.LocalDateTime
+                    });
+                }
+
+                if (list.Count > 0) result[p.Name] = list.OrderByDescending(c => c.Date).ToList();
+            }
+
+            return result;
+        }
+
+
+        // ---------- Поиск по площадкам ----------
+
+        /// Грузы с закрытых площадок контакта (сырой JSON). Ответ: { cargos: [...], total }.
+        public Task<string> SearchCargoRawAsync(List<string>? boardIds = null)
+        {
+            var route = Need(_opt.Endpoints.CargoSearchByBoards,
+                nameof(AtiEndpoints.CargoSearchByBoards));
+
+            var parts = (boardIds ?? new List<string>())
+                .Select(id => "board_ids=" + Uri.EscapeDataString(id))
+                .ToList();
+            parts.Add("skip=0");
+            parts.Add("take=100");
+
+            return GetAsync<string>(route + "?" + string.Join("&", parts));
+        }
+
         /// Страница грузов с закрытых площадок, разобранная для карточек.
-        /// skip = 0 начинает новый поиск, дальше листается та же выдача.
+        /// skip = 0 начинает новый поиск, дальше листается та же выдача (15 минут).
         public async Task<(List<AtiBoardCargo> Items, int Total)> SearchCargosAsync(
             List<string>? boardIds, int skip, int take = 100)
         {
@@ -1068,50 +1404,487 @@ namespace Logistics.Web.Services
             return (list, Int(root, "total"));
         }
 
-        /// Названия кузовов по списку TypeId (поле body_types).
-        public string BodyNamesByTypeIds(IEnumerable<int> typeIds)
-        {
-            if (_carTypesCache == null) return "";
+        // ---------- Встречные предложения на свои грузы ----------
 
-            var set = typeIds.ToHashSet();
-            return string.Join(", ", _carTypesCache
-                .Where(t => set.Contains(t.TypeId))
-                .Select(t => t.Name));
+        public async Task<string> SearchOrdersRawAsync()
+        {
+            if (string.IsNullOrWhiteSpace(_opt.OrdersSearchBodyJson))
+            {
+                throw new InvalidOperationException(
+                    "Укажите тело запроса из документации ATI в Ati:OrdersSearchBodyJson.");
+            }
+
+            using var body = JsonDocument.Parse(_opt.OrdersSearchBodyJson);
+            return await PostAsync<string>("v1.2/orders/search", body.RootElement);
+        }
+
+        public Task<string> GetIncomingInvitesRawAsync()
+    => GetAsync<string>("v1.2/orders/invites/my");
+
+        public Task<string> GetCounterOffersRawAsync()
+            => GetAsync<string>(
+                Need(_opt.Endpoints.CounterOffersAll, nameof(AtiEndpoints.CounterOffersAll)));
+
+        /// Встречные предложения на свои опубликованные грузы, разобранные для карточек.
+        /// Понимает оба формата ATI: v1.0 (ResponseId, NdsPrice) и gw (id, nds_price).
+        public async Task<List<AtiOffer>> GetCounterOffersAsync()
+        {
+            var raw = await GetCounterOffersRawAsync();
+            var list = new List<AtiOffer>();
+            if (string.IsNullOrWhiteSpace(raw)) return list;
+
+            using var doc = JsonDocument.Parse(raw);
+            CollectOffers(doc.RootElement, list, 0);
+
+            return list.OrderByDescending(o => o.AddedAt).ToList();
+        }
+
+        /// Встречные предложения на свои архивные (неопубликованные) грузы.
+        public async Task<List<AtiOffer>> GetUnpublishedCounterOffersAsync(int days = 30)
+        {
+            var raw = await GetAsync<string>(OffersApi + "unpublished/counter-offers?fromDate=" +
+                                             AtiDate(DateTime.UtcNow.AddDays(-days)));
+            var list = new List<AtiOffer>();
+            if (string.IsNullOrWhiteSpace(raw)) return list;
+
+            using var doc = JsonDocument.Parse(raw);
+            CollectOffers(doc.RootElement, list, 0);
+            return list.OrderByDescending(o => o.AddedAt).ToList();
+        }
+
+        private static void CollectOffers(JsonElement el, List<AtiOffer> list, int depth)
+        {
+            if (depth > 4) return;
+
+            if (el.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var x in el.EnumerateArray()) CollectOffers(x, list, depth + 1);
+                return;
+            }
+
+            if (el.ValueKind != JsonValueKind.Object) return;
+
+            var id = StrAny(el, "id", "ResponseId");
+            var cargoId = StrAny(el, "cargo_id", "LoadId");
+
+            if (id == null || cargoId == null)
+            {
+                // словарь «id груза → { Result: [...] }»
+                foreach (var p in el.EnumerateObject()) CollectOffers(p.Value, list, depth + 1);
+                return;
+            }
+
+            var firm = ChildAny(el, "firm_info");
+            if (firm.ValueKind != JsonValueKind.Object) firm = ChildAny(el, "FirmInfo");
+            var contact = ChildAny(firm, "contact");
+
+            list.Add(new AtiOffer
+            {
+                Id = id,
+                CargoId = cargoId,
+                CargoNumber = StrAny(el, "cargo_number", "LoadNumber") ?? "",
+                FirmName = StrAny(el, "FirmName") ?? StrAny(firm, "full_firm_name", "FullFirmName") ?? "",
+                Score = DecAny(firm, "total_score", "TotalScore") ?? 0,
+                ContactName = StrAny(contact, "name") ?? "",
+                Phone = StrAny(contact, "mobile", "telephone") ?? "",
+                Price = DecAny(el, "price") ?? 0,
+                NdsPrice = DecAny(el, "nds_price", "NdsPrice") ?? 0,
+                NotNdsPrice = DecAny(el, "not_nds_price", "NotNdsPrice") ?? 0,
+                NdsPercent = DecAny(el, "nds_percent", "NdsPercent") ?? 0,
+                Note = StrAny(el, "note") ?? "",
+                LoadingDate = DateAny(el, "loading_date", "LoadingDate")?.Date,
+                AddedAt = DateAny(el, "added_at", "AddedAt")?.LocalDateTime,
+                IsOutdated = ChildAny(el, "is_outdated").ValueKind == JsonValueKind.True ||
+                             ChildAny(el, "IsOutdated").ValueKind == JsonValueKind.True,
+                IsNoLoad = ChildAny(el, "IsNoLoad").ValueKind == JsonValueKind.True
+            });
+        }
+
+        /// Удалить чужое встречное предложение на своём грузе.
+        public async Task DeleteCounterOfferAsync(string cargoId, string offerId)
+        {
+            HttpResponseMessage resp;
+            var cargo = Uri.EscapeDataString(cargoId);
+
+            if ((_opt.Endpoints.CounterOffersAll ?? "")
+                .Contains("cargo-counter-offers-api", StringComparison.OrdinalIgnoreCase))
+            {
+                var req = new HttpRequestMessage(HttpMethod.Delete, OfferRoute(cargoId))
+                {
+                    Content = JsonContent.Create(new[] { offerId })
+                };
+                resp = await _http.SendAsync(req);
+            }
+            else
+            {
+                var ids = Uri.EscapeDataString(JsonSerializer.Serialize(new[] { offerId }));
+                resp = await _http.DeleteAsync("v1.0/loads/new/" + cargo + "/responses?ids=" + ids);
+            }
+
+            var raw = await ReadAsync<string>(resp);
+            if (string.IsNullOrWhiteSpace(raw)) return;
+
+            using var doc = JsonDocument.Parse(raw);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object) return;
+
+            foreach (var p in doc.RootElement.EnumerateObject())
+            {
+                var status = DecAny(p.Value, "Status");
+                var error = StrAny(p.Value, "error");
+
+                if ((status != null && status != 0) || error != null)
+                {
+                    throw new InvalidOperationException(
+                        "ATI не удалил предложение: " + (error ?? StrAny(p.Value, "message") ?? "ошибка"));
+                }
+            }
+        }
+
+        private static decimal? DecAny(JsonElement el, params string[] names)
+        {
+            foreach (var n in names)
+            {
+                var s = ToText(ChildAny(el, n));
+                if (s != null &&
+                    decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var d))
+                {
+                    return d;
+                }
+            }
+
+            return null;
+        }
+
+        private static DateTimeOffset? DateAny(JsonElement el, params string[] names)
+        {
+            foreach (var n in names)
+            {
+                var v = ChildAny(el, n);
+                if (v.ValueKind == JsonValueKind.String &&
+                    DateTimeOffset.TryParse(v.GetString(), CultureInfo.InvariantCulture,
+                        DateTimeStyles.AssumeUniversal, out var d))
+                {
+                    return d;
+                }
+            }
+
+            return null;
+        }
+
+        // ---------- Свои встречные предложения на чужие грузы ----------
+
+        private static string OfferRoute(string cargoId)
+            => OffersApi + Uri.EscapeDataString(cargoId) + "/counter-offers";
+
+        private static string AtiDate(DateTime utc)
+            => Uri.EscapeDataString(new DateTimeOffset(utc, TimeSpan.Zero).ToString("yyyy-MM-dd'T'HH:mm:sszzz"));
+
+        private static string ErrorText(string body)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                var reason = StrAny(doc.RootElement, "reason", "Reason", "error", "Error");
+                if (reason != null) return reason;
+            }
+            catch (JsonException)
+            {
+                // тело не JSON
+            }
+
+            return body;
+        }
+
+        private static Dictionary<string, object?> BuildOfferBody(AtiOfferDraft d)
+        {
+            if (!(d.NdsPrice > 0) && !(d.NotNdsPrice > 0) && !(d.Price > 0))
+                throw new InvalidOperationException("Укажите хотя бы одну ставку.");
+            if (d.NdsPrice > 0 && (d.NdsPercent < 1 || d.NdsPercent > 99))
+                throw new InvalidOperationException("Укажите процент НДС от 1 до 99.");
+            if (d.PrepayPercent < 0 || d.PrepayPercent > 100)
+                throw new InvalidOperationException("Предоплата: от 0 до 100 %.");
+            if (d.PayAfterBankDays < 0 || d.PayAfterBankDays > 99)
+                throw new InvalidOperationException("Оплата через банковские дни: от 0 до 99.");
+            if (d.LoadingDate != null && d.LoadingDate.Value.Date < DateTime.Today)
+                throw new InvalidOperationException("Дата загрузки в прошлом.");
+
+            var note = (d.Note ?? "").Trim();
+            if (note.Length > 512)
+                throw new InvalidOperationException("Примечание длиннее 512 символов.");
+
+            // pay_attributes: 1 нал, 2 безнал, 8 с НДС, 16 предоплата, 64 оплата через N банковских дней
+            var attrs = 0;
+            if (d.Price > 0) attrs |= 1;
+            if (d.NdsPrice > 0 || d.NotNdsPrice > 0) attrs |= 2;
+            if (d.NdsPrice > 0) attrs |= 8;
+            if (d.PrepayPercent > 0) attrs |= 16;
+            if (d.PayAfterBankDays > 0) attrs |= 64;
+
+            var body = new Dictionary<string, object?>();
+            if (d.ContactId > 0) body["contact_id"] = d.ContactId;
+
+            if (d.Price > 0)
+            {
+                body["price"] = d.Price;
+                body["currency_id"] = 1;
+            }
+
+            if (d.NdsPrice > 0)
+            {
+                body["nds_price"] = d.NdsPrice;
+                body["nds_percent"] = d.NdsPercent;
+                body["nds_currency_id"] = 1;
+            }
+
+            if (d.NotNdsPrice > 0)
+            {
+                body["not_nds_price"] = d.NotNdsPrice;
+                body["not_nds_currency_id"] = 1;
+            }
+
+            if (note.Length > 0) body["note"] = note;
+            if (d.PrepayPercent > 0) body["prepay_percent"] = d.PrepayPercent;
+            if (d.PayAfterBankDays > 0) body["pay_after_max_bank_days"] = d.PayAfterBankDays;
+            if (d.LoadingDate != null) body["loading_date"] = d.LoadingDate.Value.ToString("yyyy-MM-dd");
+            body["pay_attributes"] = attrs;
+
+            return body;
+        }
+
+        private static AtiOffer? ParseSingleOffer(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+
+            var list = new List<AtiOffer>();
+            using var doc = JsonDocument.Parse(raw);
+            CollectOffers(doc.RootElement, list, 0);
+            return list.FirstOrDefault();
+        }
+
+        private async Task DeleteMyOffersCore(string cargoId)
+        {
+            using var resp = await _http.DeleteAsync(OfferRoute(cargoId) + "/my");
+            var text = await resp.Content.ReadAsStringAsync();
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(
+                    "ATI " + (int)resp.StatusCode + ": " + ErrorText(text));
+            }
         }
 
         /// Отправить своё предложение на чужой груз.
-        /// Формат тела взят по аналогии с ответом списка предложений — сверить с документацией.
-        public Task<string> CreateCounterOfferAsync(string cargoId, AtiOfferDraft d)
+        public async Task<(AtiOffer? Offer, string Raw)> CreateCounterOfferAsync(string cargoId, AtiOfferDraft d)
         {
-            if (!(d.NdsPrice > 0) && !(d.NotNdsPrice > 0) && !(d.Price > 0))
-            {
-                throw new InvalidOperationException("Укажите хотя бы одну ставку.");
-            }
-
-            if (d.LoadingDate != null && d.LoadingDate.Value.Date < DateTime.Today)
-            {
-                throw new InvalidOperationException("Дата загрузки в прошлом.");
-            }
-
-            var body = new Dictionary<string, object?>();
-            if (d.NdsPrice > 0) body["nds_price"] = d.NdsPrice;
-            if (d.NotNdsPrice > 0) body["not_nds_price"] = d.NotNdsPrice;
-            if (d.Price > 0) body["price"] = d.Price;
-            if (d.LoadingDate != null) body["loading_date"] = d.LoadingDate.Value.ToString("yyyy-MM-dd");
-            Put(body, "note", d.Note?.Trim());
-
-            var route = "gw/cargo-counter-offers-api/integrator/v1/cargos/" +
-                        Uri.EscapeDataString(cargoId) + "/counter-offers";
+            var body = BuildOfferBody(d);
+            var route = OfferRoute(cargoId);
 
             if (_opt.DryRun)
             {
-                return Task.FromResult("DRY-RUN: запрос не отправлен.\nPOST " + route + "\n" +
-                                       JsonSerializer.Serialize(body, Pretty));
+                return (null, "DRY-RUN: запрос не отправлен.\nPOST " + route + "\n" +
+                              JsonSerializer.Serialize(body, Pretty));
             }
 
-            return PostAsync<string>(route, body);
+            var raw = await PostAsync<string>(route, body);
+            return (ParseSingleOffer(raw), raw);
         }
 
+        /// Изменить своё предложение по его ID.
+        public async Task<(AtiOffer? Offer, string Raw)> UpdateCounterOfferAsync(
+            string cargoId, string offerId, AtiOfferDraft d)
+        {
+            var body = BuildOfferBody(d);
+            var route = OfferRoute(cargoId) + "/" + Uri.EscapeDataString(offerId);
+
+            if (_opt.DryRun)
+            {
+                return (null, "DRY-RUN: запрос не отправлен.\nPUT " + route + "\n" +
+                              JsonSerializer.Serialize(body, Pretty));
+            }
+
+            var raw = await PutAsync<string>(route, body);
+            return (ParseSingleOffer(raw), raw);
+        }
+
+        /// Заменить своё предложение, когда его ID неизвестен: отозвать все свои и отправить новое.
+        /// Проверка полей идёт до отзыва, чтобы не потерять предложение из-за ошибки в форме.
+        public async Task<(AtiOffer? Offer, string Raw)> ReplaceCounterOfferAsync(string cargoId, AtiOfferDraft d)
+        {
+            var body = BuildOfferBody(d);
+            var route = OfferRoute(cargoId);
+
+            if (_opt.DryRun)
+            {
+                return (null, "DRY-RUN: запрос не отправлен.\nDELETE " + route + "/my\nPOST " + route + "\n" +
+                              JsonSerializer.Serialize(body, Pretty));
+            }
+
+            await DeleteMyOffersCore(cargoId);
+            var raw = await PostAsync<string>(route, body);
+            return (ParseSingleOffer(raw), raw);
+        }
+
+        /// Отозвать все свои предложения с чужого груза.
+        public async Task DeleteMyCounterOffersAsync(string cargoId)
+        {
+            if (_opt.DryRun) return;
+            await DeleteMyOffersCore(cargoId);
+        }
+
+        /// ID чужих грузов, на которых у нас есть активное встречное предложение.
+        public async Task<HashSet<string>> GetMyOfferStatusesAsync(int days = 30)
+        {
+            var raw = await GetAsync<string>(OffersApi + "counter-offers/statuses?dateFrom=" +
+                                             AtiDate(DateTime.UtcNow.AddDays(-days)));
+            var set = new HashSet<string>();
+            if (string.IsNullOrWhiteSpace(raw)) return set;
+
+            using var doc = JsonDocument.Parse(raw);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array) return set;
+
+            foreach (var x in doc.RootElement.EnumerateArray())
+            {
+                var id = Str(x, "cargo_id");
+                if (id != null && Bool(x, "has_active")) set.Add(id);
+            }
+
+            return set;
+        }
+
+        /// Одно встречное предложение по его ID.
+        public async Task<AtiOffer?> GetCounterOfferAsync(string offerId)
+        {
+            var raw = await GetAsync<string>(OffersApi + "counter-offers/" + Uri.EscapeDataString(offerId));
+            return ParseSingleOffer(raw);
+        }
+
+        // ---------- Поиск транспорта ----------
+
+        public sealed record TruckSearchItem(
+            string AtiId,
+            string FirmName,
+            int LoadingCityId,
+            ulong CarType,
+            decimal Weight,
+            decimal Volume,
+            DateTime? FirstDate,
+            DateTime? LastDate,
+            string Note,
+            IReadOnlyList<string> Contacts);
+
+        public async Task<(List<TruckSearchItem> Items, int Total, int Hidden)> SearchTrucksAsync(
+            AtiLoad load, bool demo)
+        {
+            if (load.LoadingCityId <= 0 || load.UnloadingCityId <= 0)
+                throw new InvalidOperationException("У груза должны быть указаны оба города.");
+
+            var filter = new Dictionary<string, object>
+            {
+                ["from"] = new { id = load.LoadingCityId, type = 2, exact_only = true },
+                ["to"] = new { id = load.UnloadingCityId, type = 2, exact_only = true },
+                ["dates"] = new { date_option = "today-plus" }
+            };
+
+            if (load.Weight > 0) filter["weight"] = new { min = load.Weight };
+            if (load.Volume > 0) filter["volume"] = new { min = load.Volume };
+            if (load.CarTypeMask > 0) filter["truck_type"] = load.CarTypeMask;
+
+            // Поиск использует POST, но не публикует и не изменяет груз.
+            // В DryRun не отправляем реальный поиск.
+            var useDemo = demo || IsDryRun;
+            var raw = await PostAsync<string>(
+                "v1.0/trucks/search/by-filter?demo=" + (useDemo ? "true" : "false"),
+                new { page = 1, items_per_page = 20, filter });
+
+            using var doc = JsonDocument.Parse(raw);
+            var root = doc.RootElement;
+            var trucks = Child(root, "trucks");
+
+            if (trucks.ValueKind != JsonValueKind.Array)
+                throw new InvalidOperationException("ATI не вернул массив trucks.");
+
+            var accounts = Child(root, "accounts");
+            var items = new List<TruckSearchItem>();
+
+            foreach (var t in trucks.EnumerateArray())
+            {
+                var atiId = Str(t, "ati_id") ?? "";
+                var firm = Child(accounts, atiId);
+                var transport = Child(t, "transport");
+                var contacts = new List<string>();
+                var contactsJson = Child(firm, "contacts");
+                var firstContactId = Int(t, "contact_id1");
+                var secondContactId = Int(t, "contact_id2");
+
+                // Показываем только контакты, которые ATI вернул для фирмы
+                // и которые указаны в объявлении машины.
+                if (contactsJson.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var c in contactsJson.EnumerateArray())
+                    {
+                        var id = Int(c, "id");
+                        if (id <= 0 || (id != firstContactId && id != secondContactId))
+                            continue;
+
+                        var text = string.Join(" · ", new[]
+                        {
+                            Str(c, "name"),
+                            Str(c, "mobile"),
+                            Str(c, "telephone")
+                        }.Where(s => !string.IsNullOrWhiteSpace(s)).Distinct());
+
+                        if (text.Length > 0) contacts.Add(text);
+                    }
+                }
+
+                items.Add(new TruckSearchItem(
+                    atiId,
+                    StrAny(firm, "full_firm_name", "firm_name") ?? "",
+                    ChildInt(t, "loading", "city_id"),
+                    ULong(transport, "car_type"),
+                    Dec(transport, "weight") ?? 0,
+                    Dec(transport, "volume") ?? 0,
+                    Date(t, "first_date")?.UtcDateTime.Date,
+                    Date(t, "last_date")?.UtcDateTime.Date,
+                    Str(t, "note") ?? "",
+                    contacts));
+            }
+
+            return (items, Int(root, "total_count"), Int(root, "hidden_count"));
+        }
+
+        // ---------- АТИ-Доки ----------
+
+        /// Создать документ на груз в АТИ-Доках. Тип: заказ, заказ (табличный вид),
+        /// заявка (к договору), заявка к договору (табличный вид), поручение экспедитору.
+        public async Task<(string Id, string Url)> CreateAtiDocAsync(
+            string cargoId, string documentType, string? templateId = null)
+        {
+            var route = "v1.0/loads/" + Uri.EscapeDataString(cargoId) +
+                        "/atidocs/" + Uri.EscapeDataString(documentType);
+
+            if (!string.IsNullOrWhiteSpace(templateId))
+            {
+                route += "?templateId=" + Uri.EscapeDataString(templateId);
+            }
+
+            if (_opt.DryRun) return ("", "");
+
+            var raw = await PostAsync<string>(route, new { });
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                throw new InvalidOperationException("ATI не вернул данные документа.");
+            }
+
+            using var doc = JsonDocument.Parse(raw);
+            var url = StrAny(doc.RootElement, "Url") ?? "";
+            if (url.Length == 0)
+            {
+                throw new InvalidOperationException("ATI не вернул ссылку на документ: " + raw);
+            }
+
+            return (StrAny(doc.RootElement, "Id") ?? "", url);
+        }
 
         // ---------- Сборка тела ----------
 
@@ -1165,12 +1938,25 @@ namespace Logistics.Web.Services
             {
                 ["trucks_count"] = d.TrucksCount,
                 ["load_type"] = d.LoadType,
-                ["required_capacity"] = d.RequiredCapacity
+                ["required_capacity"] = d.RequiredCapacity,
+
+                ["body_loading"] = BuildBodyHandling(
+                    d.BodyLoadingTypeIds,
+                    d.IsAllBodyLoadingRequired),
+
+                ["body_unloading"] = BuildBodyHandling(
+                    d.BodyUnloadingTypeIds,
+                    d.IsAllBodyUnloadingRequired)
             };
 
-            if (d.BodyTypeId > 0)
+            var bodyTypeIds = d.BodyTypeIds
+                .Where(id => id > 0)
+                .Distinct()
+                .ToArray();
+
+            if (bodyTypeIds.Length > 0)
             {
-                truck["body_types"] = new[] { d.BodyTypeId };
+                truck["body_types"] = d.BodyTypeIds;
             }
 
             var payment = new Dictionary<string, object?>
@@ -1212,12 +1998,13 @@ namespace Logistics.Web.Services
                 ["contacts"] = new[] { d.ContactId }
             };
 
-            if (!string.IsNullOrWhiteSpace(d.BoardId))
+            var boardIds = d.BoardIds.Where(b => !string.IsNullOrWhiteSpace(b)).Distinct().ToList();
+            if (boardIds.Count > 0)
             {
-                app["boards"] = new[]
-                {
-                    new { id = d.BoardId.Trim(), publication_mode = "now" }
-                };
+                var mode = string.IsNullOrWhiteSpace(d.PublicationMode) ? "now" : d.PublicationMode;
+                app["boards"] = boardIds
+                    .Select(b => new { id = b.Trim(), publication_mode = mode })
+                    .ToArray();
             }
 
             Put(app, "note", d.Note);
@@ -1350,7 +2137,7 @@ namespace Logistics.Web.Services
                 ? v
                 : default;
 
-        /// То же, но без учёта регистра имени (для ответов с ошибками).
+        /// То же, но без учёта регистра имени.
         private static JsonElement ChildAny(JsonElement el, string name)
         {
             if (el.ValueKind != JsonValueKind.Object) return default;
